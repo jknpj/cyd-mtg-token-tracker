@@ -72,6 +72,14 @@ Para caber na flash com mais de 450 tokens, cada token guarda uma unica JPEG, no
 
 O script ajusta as imagens para a tela: recorta para a caixa da arte e escurece os tons medios das artes muito claras (`ART_MAX_MEAN`), que estouram no painel TN do CYD. As cores desse painel tambem mudam bastante com o angulo de visao: com a placa deitada na mesa a carta fica lavada, e as cartas brancas estouram. Por isso a moldura branca e um creme (e nao o branco mais claro que o painel mostra) e ha **CARD TONE** e **SCREEN** na segunda pagina das configuracoes. Se todas as cores (e nao so as claras) parecem estouradas, o culpado costuma ser a gama do proprio painel: veja **DISPLAY GAMMA**, na terceira pagina. Por causa do tamanho da arte, `platformio.ini` usa a tabela de particoes `huge_app.csv`, e a gravacao demora mais.
 
+### Arte em alta qualidade no microSD
+
+O gerador tambem grava a arte de todos os tokens em alta qualidade (JPEG qualidade 90, cor 4:4:4) em `sdcard/mtgart`, nos dois tamanhos (`full/` 214x128 e `classic/` 164x96, entao o layout Classic nao precisa reduzir a imagem), alem de `artists.txt` e `catalog.txt`. Para usar, copie a pasta `mtgart` para a raiz de um microSD em FAT32 (o resultado deve ser `/mtgart/catalog.txt`), coloque o cartao no slot do CYD e reinicie a placa. O cartao so e lido na inicializacao.
+
+O firmware le a arte de cada token do cartao quando ela existe e, senao, usa a arte embutida na flash; sem cartao, a placa funciona igual. O canto superior direito das paginas de configuracao mostra o estado: `SD HD ART` (em uso), `SD: NO ART` (cartao sem `/mtgart`) ou `SD: OLD ART` (arte gerada para outro catalogo, ignorada; gere e copie de novo). Sem cartao nada aparece. Use `--no-sd-art` para nao gerar essa pasta. A pasta `sdcard/` fica fora do controle de versao.
+
+O slot de microSD do CYD usa os pinos do VSPI (SCK 18, MISO 19, MOSI 23, CS 5); o touch usa o mesmo periferico SPI em outros pinos, entao o firmware troca os pinos a cada acesso ao cartao.
+
 Quantidades, marcadores, modificadores e o token selecionado ficam salvos na flash (NVS) e sao restaurados ao religar a placa.
 
 ## Configuracoes

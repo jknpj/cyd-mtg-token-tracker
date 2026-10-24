@@ -6,6 +6,7 @@
 .vscode/ipch
 # token art is Wizards of the Coast IP; regenerate with tools/fetch_tokens.py
 src/token_art_generated.h
+sdcard/
 tools/art_cache/
 tools/catalog_cache/
 __pycache__/

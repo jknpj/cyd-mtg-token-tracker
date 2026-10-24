@@ -1,5 +1,6 @@
 """Builds src/tokens_generated.h and the token art in src/token_art_generated.h from Scryfall.
 
+Also writes the high-quality art for a microSD card in sdcard/mtgart (copy that folder to the card).
 Run with the PlatformIO Python. The art needs Pillow (python -m pip install pillow); without it, or
 with --no-art, only the catalog is written:
     %USERPROFILE%\\.platformio\\penv\\Scripts\\python.exe tools\\fetch_tokens.py
@@ -11,6 +12,7 @@ import hashlib
 import io
 import json
 import re
+import shutil
 import sys
 import time
 import unicodedata
@@ -35,8 +37,8 @@ CATALOG_CACHE = Path(__file__).resolve().parent / "catalog_cache"
 REQUEST_DELAY = 0.2  # Scryfall asks for at least 50-100 ms between requests.
 RETRIES = 5  # Attempts per query when Scryfall answers 429 Too Many Requests.
 
-# Art box sizes of FULL_GEO and CLASSIC_GEO in src/main.cpp. Each token gets one JPEG per size, so
-# the firmware never has to scale.
+# Art box sizes of FULL_GEO and CLASSIC_GEO in src/main.cpp. The microSD card gets one JPEG per size,
+# so the firmware never has to scale its art.
 ART_SIZES = {"full": (214, 128), "classic": (164, 96)}
 # Only the full layout's art is stored; the firmware scales it down for the classic layout, which
 # halves the flash the art needs. Chroma at half resolution (4:2:0) saves another fifth.
@@ -44,6 +46,9 @@ ART_SIZE = ART_SIZES["full"]
 JPEG_QUALITY = 85
 ART_BYTE_BUDGET = 2_500_000  # Leave room for the program and expanded rules in the 3 MiB app.
 REFRESH_CACHE = False
+# The microSD card has room for every token's art at both sizes in full color (4:4:4) and high quality.
+SD_OUTPUT = ROOT / "sdcard" / "mtgart"
+SD_JPEG_QUALITY = 90
 # Scryfall art crops are taller than the art boxes. Where the crop keeps its window, from 0 (top)
 # to 1 (bottom); subjects tend to sit a little above the middle.
 ART_FOCUS_Y = 0.4
@@ -416,12 +421,12 @@ def tame_bright(image):
     return image.point(curve * 3)
 
 
-def encode_art(image, whole=False, quality=JPEG_QUALITY):
+def encode_art(image, whole=False, quality=JPEG_QUALITY, size=ART_SIZE, subsampling=2):
     """Scales the art to the box (cropping it, or fitting it whole) and encodes a baseline JPEG."""
-    scaled = tame_bright(fit_over_blur(image, ART_SIZE) if whole else cover(image, ART_SIZE))
+    scaled = tame_bright(fit_over_blur(image, size) if whole else cover(image, size))
     output = io.BytesIO()
     # Baseline (not progressive) JPEG: the decoder on the board only reads baseline.
-    scaled.save(output, "JPEG", quality=quality, optimize=True, progressive=False, subsampling=2)
+    scaled.save(output, "JPEG", quality=quality, optimize=True, progressive=False, subsampling=subsampling)
     return output.getvalue()
 
 
@@ -496,6 +501,43 @@ def write_art(faces, catalog_id, quality=JPEG_QUALITY):
     print(f"art for {sum(1 for entry in entries if entry[1])} tokens, {len(blob)} bytes, written to {ART_OUTPUT}")
 
 
+def art_image(face):
+    """The token's illustration as an RGB image, or None when Scryfall has none."""
+    url = art_url(face)
+    data = download(url) if url else None
+    if data is None:
+        return None
+    image = Image.open(io.BytesIO(data)).convert("RGB")
+    half = face.get("flip_half")
+    return flip_illustration(image, half) if half is not None else image
+
+
+def write_sd_art(faces, catalog_id, quality=SD_JPEG_QUALITY):
+    """Writes SD_OUTPUT for the microSD card: catalog.txt with the CATALOG_ID it was made for,
+    artists.txt with one illustrator per catalog entry, and full/NNNN.jpg and classic/NNNN.jpg, where
+    NNNN is the entry's position counting from 1 (Custom is 0 and has no art)."""
+    if SD_OUTPUT.exists():
+        shutil.rmtree(SD_OUTPUT)
+    for name in ART_SIZES:
+        (SD_OUTPUT / name).mkdir(parents=True)
+    artists = []
+    count = total = 0
+    for number, (_, face) in enumerate(faces, start=1):
+        image = art_image(face)
+        artists.append(ascii_name(face.get("artist") or "") if image is not None else "")
+        if image is None:
+            continue
+        for name, size in ART_SIZES.items():
+            jpeg = encode_art(image, whole=face.get("flip_half") is not None, quality=quality, size=size, subsampling=0)
+            (SD_OUTPUT / name / f"{number:04d}.jpg").write_bytes(jpeg)
+            total += len(jpeg)
+        count += 1
+    (SD_OUTPUT / "artists.txt").write_text("\n".join(artists) + "\n", encoding="ascii", newline="\n")
+    # Written last: the firmware only uses a folder whose catalog.txt matches its catalog.
+    (SD_OUTPUT / "catalog.txt").write_text(f"{catalog_id:08X}\n", encoding="ascii", newline="\n")
+    print(f"microSD art for {count} tokens, {total} bytes at quality {quality}, written to {SD_OUTPUT}")
+
+
 def drop_stale_art(catalog_id):
     """Removes art made for another catalog: the firmware would refuse to build with it."""
     if not ART_OUTPUT.exists():
@@ -510,6 +552,7 @@ def main():
     global REFRESH_CACHE
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--no-art", action="store_true", help="only write the catalog, not the art")
+    parser.add_argument("--no-sd-art", action="store_true", help="skip the high-quality art for the microSD card")
     parser.add_argument("--refresh", action="store_true", help="refresh cached API data")
     parser.add_argument("--as-of", default=datetime.date.today().isoformat(), type=lambda s: datetime.date.fromisoformat(s).isoformat(),
                         help="include Commander precons released by this date (YYYY-MM-DD)")
@@ -600,6 +643,8 @@ def main():
         drop_stale_art(catalog_id)
     else:
         write_art(faces, catalog_id)
+        if not args.no_sd_art:
+            write_sd_art(faces, catalog_id)
 
 
 if __name__ == "__main__":

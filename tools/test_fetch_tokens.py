@@ -88,6 +88,24 @@ class TokenCatalogTests(unittest.TestCase):
         self.assertIn("ART_DATA[80]", text)
         self.assertEqual(text.count('{0, 80, ""}'), 2)
 
+    def test_sd_art_has_both_sizes_artists_and_catalog(self):
+        with_art = {**face(), "artist": "Ana", "image_uris": {"art_crop": "https://example.invalid/a.jpg"}}
+        without_art = {**face("Dog"), "artist": "Bo", "image_status": "missing"}
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "sdcard" / "mtgart"
+            (output / "full").mkdir(parents=True)
+            (output / "full" / "0009.jpg").write_bytes(b"stale")
+            with patch.object(tokens, "SD_OUTPUT", output), patch.object(tokens, "Image"):
+                with patch.object(tokens, "download", return_value=b"image"):
+                    with patch.object(tokens, "encode_art", side_effect=lambda image, whole, quality, size, subsampling:
+                                      f"{size[0]}x{size[1]} q{quality} s{subsampling}".encode()):
+                        tokens.write_sd_art([("Cat", with_art), ("Dog", without_art)], 0x00FD8168)
+            self.assertEqual((output / "catalog.txt").read_text(), "00FD8168\n")
+            self.assertEqual((output / "artists.txt").read_text(), "Ana\n\n")
+            self.assertEqual((output / "full" / "0001.jpg").read_bytes(), b"214x128 q90 s0")
+            self.assertEqual((output / "classic" / "0001.jpg").read_bytes(), b"164x96 q90 s0")
+            self.assertEqual(sorted(path.name for path in (output / "full").iterdir()), ["0001.jpg"])
+
     def test_deck_links_cover_precons_without_token_sets(self):
         decks = [
             {"type": "Commander Deck", "code": "CMD", "fileName": "Old", "releaseDate": "2011-06-17"},

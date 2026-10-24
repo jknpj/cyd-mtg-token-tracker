@@ -72,6 +72,14 @@ To fit more than 450 tokens in flash, each token stores a single JPEG at the art
 
 The script adjusts images for the display: it crops them to the artwork area and darkens the midtones of very bright artwork (`ART_MAX_MEAN`), which can blow out on the CYD's TN panel. Colors on this panel also change significantly with viewing angle: when the board lies flat on the table, the card looks washed out and white cards look overexposed. For this reason, the white frame is cream (rather than the brightest white the panel can show), and **CARD TONE** and **SCREEN** are available on the second settings page. If all colors (not only light ones) look overexposed, the panel's gamma is usually the cause: see **DISPLAY GAMMA** on the third page. Because the artwork is large, `platformio.ini` uses the `huge_app.csv` partition table, and flashing takes longer.
 
+### High-quality artwork on microSD
+
+The generator also writes every token's artwork at high quality (JPEG quality 90, 4:4:4 color) to `sdcard/mtgart`, in both sizes (`full/` 214x128 and `classic/` 164x96, so the Classic layout needs no scaling), plus `artists.txt` and `catalog.txt`. To use it, copy the `mtgart` folder to the root of a FAT32 microSD card (the result must be `/mtgart/catalog.txt`), insert the card in the CYD's slot, and restart the board. The card is read only at startup.
+
+The firmware reads each token's art from the card when available and falls back to the embedded flash art otherwise, so the board works the same without a card. The top-right corner of the settings pages shows the state: `SD HD ART` (in use), `SD: NO ART` (card without `/mtgart`), or `SD: OLD ART` (art generated for a different catalog, ignored; regenerate and copy it again). Nothing is shown without a card. Use `--no-sd-art` to skip this folder. The `sdcard/` folder is excluded from version control.
+
+The CYD's microSD slot uses the VSPI pins (SCK 18, MISO 19, MOSI 23, CS 5); the touch controller uses the same SPI peripheral on other pins, so the firmware switches the pins around each card access.
+
 Quantities, counters, modifiers, and the selected token are saved in flash (NVS) and restored when the board restarts.
 
 ## Settings

@@ -1,163 +1,169 @@
-# Tokens de MTG no CYD 2,8"
+# MTG Tokens on the CYD 2.8"
 
-Firmware offline para navegar por 455 entradas de tokens/emblemas de MTG (mais `Custom`) e ajustar a quantidade em jogo usando o touch. O catalogo cobre os 198 precons de Commander listados nas fontes ate 24/10/2026, incluindo os staples, Cat/Dog de Rin and Seri e Cragflame de Mabel. Tem tres layouts de tela, brilho e desligamento automatico da tela ajustaveis e busca de tokens.
+**English** | [Português (Brasil)](README.pt-BR.md)
 
-## Placa assumida
+Offline firmware for browsing 455 MTG token/emblem entries (plus `Custom`) and tracking their in-play quantities using the touchscreen. The catalog covers the 198 Commander precons listed by the sources through 2026-10-24, including staples, Rin and Seri's Cat and Dog tokens, and Mabel's Cragflame. It includes three screen layouts, adjustable brightness and automatic screen timeout, and token search.
 
-Este projeto assume o CYD ESP32-2432S028R, com tela ILI9341 e touch resistivo XPT2046. A pinagem configurada e a comum nessa variante:
+## Target board
 
-- Tela (HSPI): SCLK 14, MISO 12, MOSI 13, CS 15, DC 2, backlight 21 (PWM)
-- Touch (VSPI, barramento proprio): SCLK 25, MISO 39, MOSI 32, CS 33, IRQ 36
+This project targets the CYD ESP32-2432S028R, with an ILI9341 display and XPT2046 resistive touchscreen. The configured pinout is the common one for this variant:
 
-Outras revisoes do CYD podem usar outro controlador ou pinagem. Confirme a identificacao impressa na placa antes de gravar.
+- Display (HSPI): SCLK 14, MISO 12, MOSI 13, CS 15, DC 2, backlight 21 (PWM)
+- Touch (dedicated VSPI bus): SCLK 25, MISO 39, MOSI 32, CS 33, IRQ 36
 
-O brilho e ajustado por PWM (LEDC) direto no pino do backlight, `BACKLIGHT_PIN` em `src/main.cpp`. Por isso `platformio.ini` nao define `TFT_BL`: a biblioteca TFT_eSPI nao deve controlar esse pino.
+Other CYD revisions may use a different controller or pinout. Check the markings on your board before flashing.
 
-## Compilar e gravar
+Brightness is controlled with PWM (LEDC) directly on the backlight pin, `BACKLIGHT_PIN` in `src/main.cpp`. For this reason, `platformio.ini` does not define `TFT_BL`: the TFT_eSPI library must not control that pin.
 
-1. Abra esta pasta no VS Code com a extensao PlatformIO instalada.
-2. Use **PlatformIO: Build** para compilar.
-3. Conecte a placa por USB e use **PlatformIO: Upload** para gravar.
-4. Abra o monitor serial em 115200 baud se quiser acompanhar a inicializacao.
+## Build and flash
 
-O token aparece como uma carta em modo retrato. No layout **Classic** (o padrao) ha uma barra inferior com estes botoes:
+1. Open this folder in VS Code with the PlatformIO extension installed.
+2. Run **PlatformIO: Build** to compile.
+3. Connect the board over USB and run **PlatformIO: Upload** to flash it.
+4. Open the serial monitor at 115200 baud to follow startup, if desired.
 
-- **<** / **>**: token anterior / proximo.
-- Botao central: alterna o que **-** e **+** editam: `QTY` (quantidade em jogo), `TAP` (quantos estao virados), `POW` e `TGH` (modificadores de poder/resistencia, so em criaturas). O item em edicao fica destacado em amarelo na carta (P/T ou icone de virados); a quantidade nao tem destaque, para nao emoldurar a arte, e o modo atual aparece escrito no botao. Os marcadores (+1/+1 e os demais) ficam na tela de **contadores**, abaixo.
-- Tocar na area da arte vira todos os tokens desvirados ou, se ja estiverem todos virados, desvira todos.
-- Tocar na barra do nome abre a lista de tokens, em paginas. Toque num nome para seleciona-lo; **<** / **>** trocam de pagina, **FIND** abre a busca, **BACK** volta para a carta e **SET** abre as configuracoes.
-- A engrenagem, na margem superior esquerda ao lado da carta, abre as **configuracoes** e a lupa, na margem superior direita, abre a **busca**. Nos outros layouts os dois icones ficam entre os botoes sobre a arte.
+The token is displayed as a portrait card. The **Classic** layout (the default) has a bottom bar with these buttons:
 
-Na arte, "IN PLAY", a quantidade e os icones de desvirado e virado so aparecem quando ha mais de um token daquele tipo em jogo; com 0 ou 1, a quantidade aparece por 2 segundos depois de ser ajustada e some em seguida, deixando a arte limpa. Ao remover tokens, os desvirados saem primeiro. O indicador de posicao (por exemplo, `1/76`) aparece brevemente ao trocar de token e depois some. O icone de mana no canto do nome indica a cor: sol (branco), gota (azul), caveira (preto), chama (vermelho), arvore (verde), roda de cinco pontos coloridos (multicolor) e losango (incolor). Os mesmos icones aparecem na lista e no seletor de cor do editor.
+- **<** / **>**: previous / next token.
+- Center button: switches what **-** and **+** edit: `QTY` (in-play quantity), `TAP` (number tapped), `POW`, and `TGH` (power/toughness modifiers, creatures only). The edited item is highlighted in yellow on the card (P/T or tapped icon); quantity is not highlighted, to avoid framing the artwork, and the current mode is shown on the button. Counters (+1/+1 and others) are on the **counters** screen below.
+- Tap the artwork to tap all untapped tokens, or untap all if they are already all tapped.
+- Tap the name bar to open the paginated token list. Tap a name to select it; **<** / **>** change pages, **FIND** opens search, **BACK** returns to the card, and **SET** opens settings.
+- The gear at the upper-left edge beside the card opens **settings**, and the magnifying glass at the upper-right edge opens **search**. In the other layouts, both icons are between the buttons over the artwork.
 
-O primeiro item da lista, `Custom`, e um token editavel: com ele selecionado, toque na parte de baixo da carta (tipo e texto) para abrir o editor de nome, linha de tipo, texto, cor e P/T. Os campos de texto usam um teclado na tela, e **SAVE** grava o token na flash.
+On the artwork, "IN PLAY", the quantity, and the untapped/tapped icons appear only when more than one token of that type is in play. With 0 or 1, the quantity appears for 2 seconds after it changes, then disappears to keep the artwork clear. When removing tokens, untapped ones are removed first. The position indicator (for example, `1/76`) appears briefly when changing tokens, then disappears. The mana icon beside the name indicates the color: sun (white), drop (blue), skull (black), flame (red), tree (green), five colored dots (multicolor), and diamond (colorless). The same icons appear in the list and the editor's color selector.
 
-O P/T exibido ja soma os marcadores e os modificadores. Tokens sem P/T (artefatos) editam apenas quantidade e tapped.
+The first item in the list, `Custom`, is an editable token. With it selected, tap the lower part of the card (type and text) to open the editor for its name, type line, rules text, color, and P/T. Text fields use an on-screen keyboard, and **SAVE** stores the token in flash.
 
-Tokens com P/T variavel preservam os simbolos impressos (`*/*`, `*/1+*` etc.), em vez de fingir que sao 0/0. Seus modificadores aparecem junto do simbolo; o rastreador nao conhece zonas como cemiterios ou a vida dos jogadores para resolver essas habilidades sozinho. Cragflame e um Equipment: seu texto aparece na carta, mas equipar e aplicar seu bonus a outra criatura continuam sendo acoes manuais.
+Displayed P/T already includes counters and modifiers. Tokens without P/T (such as artifacts) only let you edit quantity and tapped status.
 
-## Contadores
+Tokens with variable P/T preserve their printed symbols (`*/*`, `*/1+*`, etc.) instead of displaying them as 0/0. Their modifiers appear beside the symbols; the tracker does not know about zones such as graveyards or players' life totals, so it cannot resolve those abilities by itself. Cragflame is an Equipment: its text appears on the card, but equipping it and applying its bonus to another creature remain manual actions.
 
-Toque na caixa de texto da carta (no `Custom`, na parte de baixo dela, onde ficam os selos) para abrir a tela de contadores. Cada linha tem **-** e **+**; **<** / **>** trocam de pagina e **BACK** volta para a carta.
+## Counters
 
-- `+1/+1` (so em criaturas): abaixo de zero vira `-1/-1`. O total aparece na linha de status, ao lado do P/T, e ja entra no P/T exibido.
-- `Custom`: um contador com nome livre, um por token. Toque no nome (o do lapis) para renomea-lo pelo teclado, com ate 10 letras.
-- Marcadores comuns: Shield, Stun, Oil, Charge e Finality.
-- Marcadores de habilidade (em azul): Flying, First strike, Double strike, Deathtouch, Lifelink, Trample, Vigilance, Menace, Reach, Hexproof e Indestructible.
+Tap the card's text box (for `Custom`, tap the lower part where the seals appear) to open the counters screen. Each row has **-** and **+**; **<** / **>** change pages, and **BACK** returns to the card.
 
-Na carta, os contadores diferentes de +1/+1 aparecem como selos na parte de baixo da caixa de texto (nas criaturas, logo acima da linha de status). Os de habilidade so mostram o numero quando ha mais de um. Se nao couberem todos, os nomes viram abreviacoes e o que sobrar aparece como `+N`.
+- `+1/+1` (creatures only): below zero, it becomes `-1/-1`. The total appears in the status line beside P/T and is included in the displayed P/T.
+- `Custom`: one freely named counter per token. Tap its name (the one with the pencil) to rename it with the on-screen keyboard, up to 10 characters.
+- Common counters: Shield, Stun, Oil, Charge, and Finality.
+- Ability counters (blue): Flying, First strike, Double strike, Deathtouch, Lifelink, Trample, Vigilance, Menace, Reach, Hexproof, and Indestructible.
 
-### Food de Ygra
+On the card, counters other than +1/+1 appear as seals at the bottom of the text box (above the status line on creatures). Ability counters show their number only when greater than one. If not all counters fit, their names are abbreviated and the remaining ones are shown as `+N`.
 
-Nas criaturas, a ultima linha da tela de contadores e `Food (Ygra)`. **+** ativa e **-** remove a marca (0/1). Ela vale para todas as copias daquele token, inclusive copias adicionadas depois, ate voce remove-la. Nao cria um token Food separado e nao remove os tipos originais.
+### Ygra's Food
 
-A criatura marcada ganha `Artifact` e `Food` na linha de tipo e um selo `Food (Ygra)`. Passa a contar uma vez para bonus que contam artefatos/Foods (por exemplo, Construct) e tambem aparece nessas buscas. A marca fica salva depois de reiniciar. Remova-a quando o efeito de Ygra deixar de valer. O custo de Food (`2, T, sacrificar: ganhar 3 de vida`) e as acoes de sacrificar/ganhar vida ainda sao executados manualmente na partida; o rastreador nao controla a vida.
+For creatures, the last row on the counters screen is `Food (Ygra)`. **+** enables the marker and **-** removes it (0/1). It applies to all copies of that token, including copies added later, until removed. It does not create a separate Food token or remove the original types.
 
-## Habilidades "para cada"
+The marked creature gains `Artifact` and `Food` on its type line and a `Food (Ygra)` seal. It counts once for bonuses that count artifacts/Foods (for example, Construct) and appears in those searches. The marker is saved across restarts. Remove it when Ygra's effect no longer applies. The Food cost (`2, T, sacrifice: gain 3 life`) and sacrificing/gaining life are still handled manually during the game; the tracker does not track life totals.
 
-Tokens com texto do tipo "gets +1/+1 for each [other] TIPO you control" tem o P/T calculado sozinho, contando os tokens daquele tipo em jogo em todo o rastreador (pela linha de tipo de cada token):
+## "For each" abilities
 
-- `Rat (Vren)`: +1/+1 para cada *outro* Rat (os Rats do Vren e os Rats comuns).
-- `Construct`: +1/+1 para cada artefato, incluindo ele mesmo (Treasure, Clue, Food etc. contam).
+Tokens with rules text like "gets +1/+1 for each [other] TYPE you control" have their P/T calculated automatically, counting tokens of that type in play across the tracker (from each token's type line):
 
-O bonus atual aparece como um selo verde (ex.: `Rats +4/+4`) e ja entra no P/T. Para permanentes que nao sao tokens (o proprio Vren, artefatos de verdade), use a linha `Rat cards` / `Artifact cards` na tela de contadores desse token. Com quantidade 0, o P/T mostrado e o que o token teria ao entrar. Habilidades de Roles e auras nao sao calculadas. O `Custom` tambem e lido, entao uma criatura personalizada com esse texto funciona igual.
+- `Rat (Vren)`: +1/+1 for each *other* Rat (both Vren's Rats and regular Rats).
+- `Construct`: +1/+1 for each artifact, including itself (Treasure, Clue, Food, etc. count).
 
-## Arte
+The current bonus appears as a green seal (for example, `Rats +4/+4`) and is included in P/T. For non-token permanents (Vren himself, actual artifacts), use the `Rat cards` / `Artifact cards` row on that token's counters screen. At quantity 0, the displayed P/T is what the token would have as it enters. Role and Aura abilities are not calculated. `Custom` is also checked, so a custom creature with this text works the same way.
 
-Cada token mostra a ilustracao da sua impressao no Scryfall, com o nome do ilustrador no rodape da carta. A arte e gerada por `tools/fetch_tokens.py` em `src/token_art_generated.h` (ate 2,5 MB) e fica fora do controle de versao, por ser propriedade da Wizards of the Coast. Sem esse arquivo o firmware compila igual, com as cores da moldura no lugar da arte.
+## Artwork
 
-Para caber na flash com mais de 450 tokens, cada token guarda uma unica JPEG, no tamanho da arte dos layouts de tela cheia (214x128, cor em 4:2:0). O layout Classic reduz essa imagem na propria placa para 164x96. O gerador baixa a qualidade JPEG de 5 em 5 so ate tudo caber; a qualidade usada fica anotada no topo de `src/token_art_generated.h`. A qualidade original (85) para todos os tokens precisaria de 4 a 8 MB, mais do que a flash de 4 MB da placa.
+Each token displays the illustration from its Scryfall printing, with the artist's name at the bottom of the card. Artwork is generated by `tools/fetch_tokens.py` into `src/token_art_generated.h` (up to 2.5 MB) and is excluded from version control because it is Wizards of the Coast intellectual property. Without this file, the firmware still compiles, using frame colors instead of artwork.
 
-O script ajusta as imagens para a tela: recorta para a caixa da arte e escurece os tons medios das artes muito claras (`ART_MAX_MEAN`), que estouram no painel TN do CYD. As cores desse painel tambem mudam bastante com o angulo de visao: com a placa deitada na mesa a carta fica lavada, e as cartas brancas estouram. Por isso a moldura branca e um creme (e nao o branco mais claro que o painel mostra) e ha **CARD TONE** e **SCREEN** na segunda pagina das configuracoes. Se todas as cores (e nao so as claras) parecem estouradas, o culpado costuma ser a gama do proprio painel: veja **DISPLAY GAMMA**, na terceira pagina. Por causa do tamanho da arte, `platformio.ini` usa a tabela de particoes `huge_app.csv`, e a gravacao demora mais.
+To fit more than 450 tokens in flash, each token stores a single JPEG at the artwork size used by the full-screen layouts (214x128, 4:2:0 color). The Classic layout scales this image on the board to 164x96. The generator lowers JPEG quality in steps of 5 only as much as needed to fit everything; the selected quality is recorded at the top of `src/token_art_generated.h`. Original quality (85) for every token would require 4 to 8 MB, more than the board's 4 MB of flash.
 
-Quantidades, marcadores, modificadores e o token selecionado ficam salvos na flash (NVS) e sao restaurados ao religar a placa.
+The script adjusts images for the display: it crops them to the artwork area and darkens the midtones of very bright artwork (`ART_MAX_MEAN`), which can blow out on the CYD's TN panel. Colors on this panel also change significantly with viewing angle: when the board lies flat on the table, the card looks washed out and white cards look overexposed. For this reason, the white frame is cream (rather than the brightest white the panel can show), and **CARD TONE** and **SCREEN** are available on the second settings page. If all colors (not only light ones) look overexposed, the panel's gamma is usually the cause: see **DISPLAY GAMMA** on the third page. Because the artwork is large, `platformio.ini` uses the `huge_app.csv` partition table, and flashing takes longer.
 
-## Configuracoes
+Quantities, counters, modifiers, and the selected token are saved in flash (NVS) and restored when the board restarts.
 
-A engrenagem (ou o botao **SET** da lista de tokens) abre a tela de configuracoes. Ela tem tres paginas; **<** / **>** trocam de pagina e **BACK** volta.
+## Settings
 
-Pagina 1:
+The gear (or the **SET** button in the token list) opens settings. There are three pages; **<** / **>** change pages, and **BACK** returns.
 
-- **BRIGHTNESS**: 10 niveis de brilho, de 10% a 100%. Use **-** / **+** ou toque nas barras para ir direto a um nivel.
-- **SCREEN OFF AFTER**: tempo sem toque ate apagar a tela: 15 s, 30 s, 1, 2, 5 ou 10 min, ou `Never` (o padrao). O toque que acorda a tela so a acende e nao aciona nenhum botao.
-- **LAYOUT**: toque numa das miniaturas.
-  - **Classic**: a carta com a barra de botoes embaixo e a engrenagem e a lupa nos cantos (o padrao).
-  - **Overlay**: a carta ocupa a tela inteira e os controles ficam sobre a arte: `<`, engrenagem, lupa e `>` no topo, botoes grandes **-** / **+** ao lado do numero e, embaixo dele, o seletor de modo (`QTY`, `TAP`, `POW`, `TGH`).
-  - **Card only**: como o Overlay, mas os controles somem depois de 4 s sem toque e sobra so a carta. O primeiro toque traz os controles de volta sem acionar nada.
+Page 1:
 
-Nos layouts de tela cheia, tocar na arte ainda vira os tokens e tocar na barra do nome ainda abre a lista. **BACK** volta para a carta.
+- **BRIGHTNESS**: 10 brightness levels, from 10% to 100%. Use **-** / **+** or tap the bars to jump directly to a level.
+- **SCREEN OFF AFTER**: idle time before the display turns off: 15 s, 30 s, 1, 2, 5, or 10 min, or `Never` (the default). The touch that wakes the screen only turns it on; it does not activate a button.
+- **LAYOUT**: tap one of the thumbnails.
+  - **Classic**: card with a button bar below and the gear and magnifying glass in the corners (default).
+  - **Overlay**: card fills the screen and controls overlay the artwork: `<`, gear, magnifying glass, and `>` at the top; large **-** / **+** buttons beside the number; and the mode selector (`QTY`, `TAP`, `POW`, `TGH`) below it.
+  - **Card only**: like Overlay, but controls disappear after 4 seconds without input, leaving only the card. The first touch brings the controls back without activating anything.
 
-Pagina 2, para quando a carta parece clara, lavada ou estourada, como com a placa deitada na mesa:
+In full-screen layouts, tapping the artwork still taps the tokens, and tapping the name bar still opens the list. **BACK** returns to the card.
 
-- **CARD TONE**: escurece a carta inteira (arte, moldura, caixas de texto e o icone de mana) e abaixa o ponto branco, para que o branco nao estoure: `ORIGINAL` (o padrao) e `DARKER 1` a `DARKER 5`. A previa entre **-** e **+** e uma carta em miniatura do token atual com o tom escolhido (no `Custom`, uma escala de cinza). Vale para a carta e para as miniaturas de layout, mas nao para o resto da interface. Se o branco ainda incomodar, diminua tambem o **BRIGHTNESS** da pagina 1.
-- **SCREEN**: `NORMAL` ou `FLIPPED`, que gira a tela 180 graus (o touch acompanha). O painel TN fica bem melhor visto de um lado do que do outro; na mesa, teste as duas posicoes girando a placa.
+Page 2, for when the card looks bright, washed out, or overexposed, such as when the board lies flat on a table:
 
-Pagina 3, para quando todas as cores parecem lavadas ou estouradas, nao so as claras:
+- **CARD TONE**: darkens the entire card (artwork, frame, text boxes, and mana icon) and lowers the white point to prevent white from blowing out: `ORIGINAL` (default) and `DARKER 1` through `DARKER 5`. The preview between **-** and **+** shows a thumbnail of the current token with the selected tone (grayscale for `Custom`). It applies to the card and layout thumbnails, but not the rest of the interface. If white still looks too bright, also reduce **BRIGHTNESS** on page 1.
+- **SCREEN**: `NORMAL` or `FLIPPED`, which rotates the display 180 degrees (touch follows). The TN panel looks much better from one side than the other; when playing on a table, try both orientations by rotating the board.
 
-- **DISPLAY GAMMA**: programa a curva de gama do painel. Esta placa precisa de inversao de cores (`TFT_INVERSION_ON`) e costuma sair da inicializacao com a gama errada, o que deixa tudo mais claro e sem contraste. **-** / **+** trocam entre os perfis; o escolhido vale na hora e a cada vez que a placa liga:
-  - `RECOMMENDED` (o padrao): as tabelas de gama do fabricante, com a curva selecionada de novo logo apos a tela ligar, o ajuste que a comunidade do TFT_eSPI (issue 2985) relata para esta placa.
-  - `NO INVERSION`: tira a inversao de cores. Se a tela ficar em negativo, volte para o perfil 1/3.
-  - `ST7789 GAMMA`: as tabelas de gama do ST7789, que alguns paineis clones usam.
-- **TEST RAMPS**: degrades de cinza, vermelho, verde e azul, do preto ao pleno, direto do painel e sem o **CARD TONE**. Num painel bem ajustado cada degrau e diferente do vizinho e os primeiros sao escuros; se os degraus claros se confundem ou os escuros ja saem acinzentados, teste outro perfil. Depois de acertar a gama, ajuste o **CARD TONE** e o **BRIGHTNESS** se ainda for preciso.
+Page 3, for when all colors look washed out or overexposed, not only light colors:
 
-As configuracoes ficam salvas na flash (NVS), separadas dos tokens, e continuam valendo quando o catalogo muda.
+- **DISPLAY GAMMA**: programs the panel's gamma curve. This board needs color inversion (`TFT_INVERSION_ON`) and often starts up with the wrong gamma, making everything too bright and low-contrast. **-** / **+** switch profiles; the selected profile takes effect immediately and whenever the board powers on:
+  - `RECOMMENDED` (default): the manufacturer's gamma tables, with the curve reselected just after the display turns on; this is the adjustment the TFT_eSPI community reports for this board (issue 2985).
+  - `NO INVERSION`: disables color inversion. If the display becomes a negative image, return to profile 1/3.
+  - `ST7789 GAMMA`: ST7789 gamma tables, used by some clone panels.
+- **TEST RAMPS**: grayscale, red, green, and blue gradients from black to full intensity, rendered directly by the panel without **CARD TONE**. On a well-adjusted panel each step differs from its neighbor and the first steps are dark; if bright steps blend together or dark steps already look gray, try another profile. After setting gamma, adjust **CARD TONE** and **BRIGHTNESS** if needed.
 
-## Busca
+Settings are saved in flash (NVS), separately from tokens, and remain in effect when the catalog changes.
 
-A lupa ou o botao **FIND** da lista de tokens abre um teclado na tela. Digite e confirme com **OK** para listar so os tokens que combinam:
+## Search
 
-- Nao diferencia maiusculas de minusculas e basta o trecho aparecer (`gob` acha o Goblin).
-- Com varias palavras separadas por espaco, todas precisam combinar, em qualquer ordem (`green 3/3` acha os tokens verdes 3/3).
-- Cada palavra e procurada no nome, na linha de tipo, no texto, no nome da cor (`white`, `blue`, `black`, `red`, `green`, `multicolor`, `colorless`) e no P/T (`3/3`).
-- **FIND** na lista refina a busca mantendo o texto digitado; **BACK** no teclado cancela. Tocar na barra do nome na carta sempre abre a lista completa, e **<** / **>** na carta continuam passando por todos os tokens.
+The magnifying glass or **FIND** button in the token list opens an on-screen keyboard. Type a query and confirm with **OK** to show matching tokens:
 
-## Ajuste do touch
+- Search is case-insensitive and matches substrings (`gob` finds Goblin).
+- With multiple space-separated words, every word must match, in any order (`green 3/3` finds green 3/3 tokens).
+- Each word is matched against the name, type line, rules text, color name (`white`, `blue`, `black`, `red`, `green`, `multicolor`, `colorless`), and P/T (`3/3`).
+- **FIND** in the list refines the search while keeping the entered text; **BACK** on the keyboard cancels. Tapping the card's name bar always opens the full list, and **<** / **>** on the card continue to cycle through all tokens.
 
-Os limites iniciais em `src/main.cpp` sao aproximados. Se os botoes responderem em posicoes erradas, calibre `TOUCH_X_MIN`, `TOUCH_X_MAX`, `TOUCH_Y_MIN` e `TOUCH_Y_MAX`. Se os eixos estiverem trocados, ajuste a conversao de `point.x` e `point.y` em `handleTouch()`.
+## Touch calibration
 
-## Catalogo de tokens
+The initial limits in `src/main.cpp` are approximate. If buttons respond at the wrong positions, calibrate `TOUCH_X_MIN`, `TOUCH_X_MAX`, `TOUCH_Y_MIN`, and `TOUCH_Y_MAX`. If the axes are swapped, adjust the conversion of `point.x` and `point.y` in `handleTouch()`.
 
-Os tokens vem de `src/tokens_generated.h`, gerado a partir da API do Scryfall. Nao edite esse arquivo a mao. O gerador preserva os staples de `SPECS` em `tools/fetch_tokens.py` no inicio e acrescenta os tokens dos precons:
+## Token catalog
 
-- Descobre os decks fisicos `Commander Deck` no MTGJSON, incluindo Secret Lair, ate a data escolhida.
-- Consulta os sets de tokens correspondentes no Scryfall e os tokens ligados a cada carta das listas dos decks. Isso tambem cobre Commander 2011/2013 e outros produtos sem set de tokens proprio.
-- Junta impressoes com o mesmo nome, tipos, cores, P/T e texto de regras; variantes diferentes permanecem separadas. Sets compartilhados podem acrescentar tokens alem dos usados pelos decks.
-- Rin and Seri tem `Cat (Rin and Seri)` **verde 1/1** e `Dog (Rin and Seri)` **branco 1/1**. O Cat branco que ja existia continua separado. `Cragflame (Mabel)` e o token lendario de Equipment.
-- Emblemas tambem entram quando disponiveis. Nao e uma lista de todas as artes alternativas, nem um motor que executa todas as habilidades de Magic.
+Tokens come from `src/tokens_generated.h`, generated from the Scryfall API. Do not edit this file by hand. The generator preserves the staples at the start of `SPECS` in `tools/fetch_tokens.py` and adds tokens from precons:
 
-Para regenerar o catalogo e a arte (precisa de internet; a arte precisa do Pillow, `python -m pip install pillow`, e sem ele ou com `--no-art` so o catalogo e gerado; as imagens baixadas ficam em `tools/art_cache` e nao sao baixadas de novo):
+- Discovers physical `Commander Deck` products in MTGJSON, including Secret Lair, up to the selected date.
+- Queries the corresponding token sets in Scryfall and tokens linked to each card in those decklists. This also covers Commander 2011/2013 and other products without their own token set.
+- Merges printings with the same name, types, colors, P/T, and rules text; different variants remain separate. Shared sets may add tokens not used by the decks.
+- Rin and Seri have `Cat (Rin and Seri)`, **green 1/1**, and `Dog (Rin and Seri)`, **white 1/1**. The existing white Cat remains separate. `Cragflame (Mabel)` is the legendary Equipment token.
+- Emblems are also included when available. This is not a list of every alternate-art printing, nor an engine that executes all Magic abilities.
+
+To regenerate the catalog and artwork (internet required; artwork generation requires Pillow, `python -m pip install pillow`; without it or with `--no-art`, only the catalog is generated; downloaded images are cached in `tools/art_cache` and are not downloaded again):
 
 ```
 %USERPROFILE%\.platformio\penv\Scripts\python.exe tools\fetch_tokens.py
 ```
 
-Os dados de API ficam em `tools/catalog_cache`. Para atualizar as fontes, use `--refresh`; para limitar a data de lancamento dos precons, use `--as-of YYYY-MM-DD` (o padrao e hoje). A snapshot incluida foi gerada com `--as-of 2026-10-24`. O gerador percorre todas as paginas e falha explicitamente se nao conseguir resolver uma entrada obrigatoria. A qualidade JPEG e reduzida automaticamente ate a arte de todos os tokens caber no orcamento de flash; as curvas de cor/tom e o gamma do painel nao mudam.
+API data is cached in `tools/catalog_cache`. Use `--refresh` to update the sources; use `--as-of YYYY-MM-DD` to limit precon release dates (the default is today). The included snapshot was generated with `--as-of 2026-10-24`. The generator processes every page and fails explicitly if it cannot resolve a required entry. JPEG quality is automatically lowered only as far as needed to fit all token artwork in the flash budget; color/tone curves and panel gamma are not changed.
 
-Para adicionar um token, acrescente uma tupla em `SPECS` no formato `(nome, cores, poder, resistencia, texto[, rotulo])` e rode o script de novo:
+To add a token, add a tuple to `SPECS` in the format `(name, colors, power, toughness, text[, label])` and run the script again:
 
-- `cores`: letras `w`, `u`, `b`, `r`, `g` ou `c` (incolor).
-- `poder`: `None` para tokens sem P/T, como artefatos.
-- `texto`: `""` exige um token sem texto, uma string exige que ela apareca no texto e `None` aceita qualquer um.
-- `rotulo`: nome exibido na lista quando dois tokens teriam o mesmo nome, como `Wurm (Deathtouch)` e `Wurm (Lifelink)`.
+- `colors`: letters `w`, `u`, `b`, `r`, `g`, or `c` (colorless).
+- `power`: `None` for tokens without P/T, such as artifacts.
+- `text`: `""` requires a token with no rules text, a string requires that text to appear, and `None` accepts any text.
+- `label`: display name in the list when two tokens would otherwise have the same name, such as `Wurm (Deathtouch)` and `Wurm (Lifelink)`.
 
-Para testar o gerador sem internet: `%USERPROFILE%\.platformio\penv\Scripts\python.exe -m unittest tools.test_fetch_tokens`.
+To test the generator without internet:
 
-### Conferencia de cobertura dos precons
+```
+%USERPROFILE%\.platformio\penv\Scripts\python.exe -m unittest tools.test_fetch_tokens
+```
 
-`tools/check_precon_coverage.py` confere o catalogo por um caminho independente das listas do MTGJSON. Ele parte da lista de produtos Commander do proprio Scryfall (sets do tipo `commander` e produtos com "Commander" no nome), percorre todas as cartas impressas neles e verifica se cada token que elas criam (e cada token dos sets de tokens desses produtos) esta no catalogo. Tambem lista os decks com cara de Commander fora do tipo `Commander Deck` e os produtos sem decklist. Sai com erro se faltar algum token criado por uma carta de precon:
+### Precon coverage audit
+
+`tools/check_precon_coverage.py` checks catalog coverage through a path independent of the MTGJSON decklists. It starts from Scryfall's own list of Commander products (sets of type `commander` and products with "Commander" in the name), walks every card printed in them, and verifies that every token they create (and every token in those products' token sets) is in the catalog. It also lists Commander-like decks outside the `Commander Deck` type and products without decklists. The script exits with an error if any token created by a precon card is missing:
 
 ```
 cd tools
 %USERPROFILE%\.platformio\penv\Scripts\python.exe check_precon_coverage.py --as-of 2026-10-24
 ```
 
-Resultado da snapshot de 2026-10-24:
+Results for the 2026-10-24 snapshot:
 
-- 198 decklists `Commander Deck` do MTGJSON, todas completas (100 cartas). 47 dos 52 produtos Commander do Scryfall tem decklist. Os 5 sem decklist nao sao precons: Commander's Arsenal, Commander Collection Green/Black, os minigames de Baldur's Gate e Mystery Booster Commander Edition. Fora do tipo `Commander Deck` so ha produtos digitais (MTGO 2009, Historic Brawl do Arena), caixas de colecao e decks Starter antigos.
-- 21.807 impressoes em 54 sets, 1.187 tokens ligados e 46 sets de tokens; 460 faces de token distintas.
-- **0 tokens faltando entre os criados por cartas de precon.** Os 29 tokens fora do catalogo vem so de cartas que nao estao em nenhum precon: drops de Secret Lair, Mystery Booster Commander e extras de collector booster (Legends Retold do DMC, Realms and Relics do LTC, cartas extras do Marvel/Final Fantasy/TMNT Eternal).
-- Designacoes de jogo (Dungeon, Monarch/Initiative, Ring, Boss, Event, contadores de Experience/Poison) nao viram tokens, porque nao sao permanentes.
+- 198 MTGJSON `Commander Deck` decklists, all complete (100 cards). 47 of Scryfall's 52 Commander products have decklists. The five without decklists are not precons: Commander's Arsenal, Commander Collection Green/Black, the Baldur's Gate minigames, and Mystery Booster Commander Edition. Products outside the `Commander Deck` type are digital products (MTGO 2009, Arena Historic Brawl), collector boxes, and old Starter decks.
+- 21,807 printings in 54 sets, 1,187 linked tokens, and 46 token sets; 460 distinct token faces.
+- **No tokens missing among those created by precon cards.** The 29 tokens absent from the catalog are only made by cards not in any precon: Secret Lair drops, Mystery Booster Commander, and collector-booster extras (Legends Retold from DMC, Realms and Relics from LTC, and Marvel/Final Fantasy/TMNT Eternal extras).
+- Game designations (Dungeon, Monarch/Initiative, Ring, Boss, Event, Experience/Poison counters) are not tokens because they are not permanents.
 
-O arquivo gerado inclui um `CATALOG_ID` e os CRCs dos prefixos da lista. Se a expansao mantiver todas as entradas antigas na mesma ordem, quantidades, selecao, contadores, nomes e cartas externas sao preservados. Catalogos incompativeis descartam apenas o estado dos tokens, com aviso no serial; `Custom` e configuracoes continuam preservados.
+The generated file includes a `CATALOG_ID` and CRCs for list prefixes. If an expansion preserves all existing entries in the same order, quantities, selection, counters, names, and custom cards are preserved. Incompatible catalogs discard only token state, with a serial warning; `Custom` and settings remain preserved.
 
-`partitions.csv` mantem os offsets da aplicacao e da NVS antiga e reserva uma NVS `tokenstore` de 128 KiB para o catalogo ampliado. O firmware migra os saves antigos automaticamente, sem apagar a NVS original. Grave normalmente com PlatformIO para atualizar tambem a tabela de particoes; nao use `erase_flash` para esta atualizacao.
+`partitions.csv` keeps the offsets of the application and original NVS and reserves a 128 KiB `tokenstore` NVS for the expanded catalog. Firmware automatically migrates old saves without erasing the original NVS. Flash normally with PlatformIO to update the partition table as well; do not use `erase_flash` for this update.

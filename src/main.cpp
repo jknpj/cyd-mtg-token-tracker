@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <JPEGDEC.h>
+#include <LittleFS.h>
 #include <Preferences.h>
 #include <SD.h>
 #include <SPI.h>
@@ -92,11 +93,21 @@ struct Config {
   uint8_t tone;        // 0..TONE_LEVELS - 1
   uint8_t flipped;     // 1 turns the whole screen upside down.
   uint8_t gammaMode;   // Index into GAMMA_PROFILES.
+  uint8_t drawArea;    // A DrawArea value: where doodles show and can be drawn.
+  uint8_t drawOpen;    // A DrawOpen value: how drawing mode opens from the card.
+  uint8_t drawStore;   // A DrawStore value: where SAVE keeps doodles.
 };
+enum class DrawArea : uint8_t { Art, Card };
+enum class DrawOpen : uint8_t { Button, Hold, Both };
+enum class DrawStore : uint8_t { Ram, Flash, Sd };
+constexpr uint8_t DRAW_OPTION_COUNT = 3;
 // Earlier firmware saved fewer fields; the others then keep their defaults.
 constexpr size_t CONFIG_V1_SIZE = offsetof(Config, tone);
 constexpr size_t CONFIG_V2_SIZE = offsetof(Config, gammaMode);
-constexpr Config DEFAULT_CONFIG = {BRIGHTNESS_LEVELS, TIMEOUT_COUNT - 1, static_cast<uint8_t>(Layout::Classic), 0, 0, 0};
+constexpr size_t CONFIG_V3_SIZE = offsetof(Config, drawArea);
+constexpr Config DEFAULT_CONFIG = {BRIGHTNESS_LEVELS, TIMEOUT_COUNT - 1, static_cast<uint8_t>(Layout::Classic), 0, 0, 0,
+                                   static_cast<uint8_t>(DrawArea::Card), static_cast<uint8_t>(DrawOpen::Both),
+                                   static_cast<uint8_t>(DrawStore::Flash)};
 
 // This board's panel needs its colors inverted, and right after the controller's own init its gamma is
 // off: the image looks washed out and the lights blow out. Selecting another gamma curve and then the
@@ -328,7 +339,7 @@ constexpr int SET_BAR_W = 11;
 constexpr int THUMB_W = 60;
 constexpr int THUMB_H = 80;
 constexpr int THUMB_STEP = 77;
-constexpr int SETTINGS_PAGES = 3;
+constexpr int SETTINGS_PAGES = 4;
 constexpr int SET_TONE_Y = 26;
 constexpr int SET_PREVIEW_TOP = 22;  // Card preview, measured from the top of its panel.
 constexpr int SET_PREVIEW_ART_W = FULL_GEO.artW / 2;
@@ -350,6 +361,11 @@ constexpr int RAMP_GAP = 2;
 constexpr int SET_RAMP_Y = SET_GAMMA_Y + SET_PANEL_H + 6;
 constexpr int SET_RAMP_H = RAMP_TOP + RAMP_ROWS * (RAMP_PATCH_H + RAMP_GAP) + 4;
 constexpr int SET_GAMMA_TIPS_Y = SET_RAMP_Y + SET_RAMP_H + 8;
+constexpr int SET_DRAW_AREA_Y = 26;
+constexpr int SET_DRAW_OPEN_Y = SET_DRAW_AREA_Y + SET_PANEL_H + 4;
+constexpr int SET_DRAW_STORE_Y = SET_DRAW_OPEN_Y + SET_PANEL_H + 4;
+constexpr int SET_DRAW_TIPS_Y = SET_DRAW_STORE_Y + SET_PANEL_H + 8;
+constexpr uint32_t DRAW_HOLD_MS = 700;  // Holding the art this long opens drawing mode.
 
 constexpr int EDIT_ROW_H = 30;
 constexpr int EDIT_NAME_Y = 26;
@@ -494,7 +510,7 @@ uint32_t positionShownAt = 0;
 bool countFlash = false;
 uint32_t countShownAt = 0;
 
-enum class Screen : uint8_t { Card, Picker, Editor, Keyboard, Settings, Counters };
+enum class Screen : uint8_t { Card, Picker, Editor, Keyboard, Settings, Counters, Drawing, DrawingTools };
 Screen screen = Screen::Card;
 size_t pickerPage = 0;
 size_t counterPage = 0;
@@ -524,6 +540,287 @@ const char *editLabel = "";
 uint8_t keyLayer = 0;
 bool keyShift = false;
 
+constexpr uint16_t DOODLE_MAX_POINTS = 1024;
+constexpr size_t DOODLE_POINT_BUDGET = 8192;
+constexpr uint8_t DOODLE_START = 0x80;
+constexpr uint32_t DOODLE_MAGIC = 0x314C4444;  // DDL1
+const uint16_t DOODLE_COLORS[] = {TFT_BLACK, TFT_WHITE, TFT_RED, TFT_YELLOW,
+                                 TFT_GREEN, TFT_CYAN, TFT_BLUE, TFT_MAGENTA};
+const uint8_t DOODLE_RADII[] = {1, 2, 4};
+struct DoodlePoint {
+  uint8_t x, style;
+  uint16_t y;
+};
+static_assert(sizeof(DoodlePoint) == 4, "drawing file format changed");
+struct Doodle {
+  DoodlePoint *points = nullptr;
+  uint16_t count = 0, capacity = 0;
+  bool loaded = false, changed = false, saved = false, failed = false;
+};
+struct DoodleHeader {
+  uint32_t magic, count, checksum;
+};
+Doodle doodles[TOKEN_COUNT];
+size_t doodleCapacity = 0;
+bool doodleStorageReady = false;
+bool doodleDown = false;
+uint8_t doodleColor = 0, doodleBrush = 1;
+bool doodleEraser = false;
+// Quick color/brush pop-up drawn over the canvas, just above the drawing toolbar.
+bool doodlePalette = false;
+constexpr int PALETTE_X = 4, PALETTE_W = SCREEN_W - 8, PALETTE_H = 90, PALETTE_Y = BAR_Y - PALETTE_H - 6;
+constexpr int PALETTE_COLOR_W = PALETTE_W / 8, PALETTE_BRUSH_W = PALETTE_W / 4;
+constexpr int PALETTE_SPLIT_Y = PALETTE_Y + 46;
+// A press on the art waiting to become a tap (on release) or a hold that opens drawing mode.
+bool artHoldPending = false;
+uint32_t artHoldAt = 0;
+const char *doodleMessage = "";
+enum class DoodlePrompt : uint8_t { None, Clear, Initialize };
+DoodlePrompt doodlePrompt = DoodlePrompt::None;
+
+void doodleError(const char *message) {
+  doodleMessage = message;
+  Serial.printf("drawing: %s\n", message);
+}
+
+bool reserveDoodle(Doodle &drawing, uint16_t capacity) {
+  if (capacity <= drawing.capacity) return true;
+  const size_t extra = capacity - drawing.capacity;
+  for (Doodle &other : doodles) {
+    if (doodleCapacity + extra <= DOODLE_POINT_BUDGET) break;
+    if (&other == &drawing || other.changed || !other.capacity) continue;
+    doodleCapacity -= other.capacity;
+    free(other.points);
+    other = Doodle{};
+  }
+  if (doodleCapacity + extra > DOODLE_POINT_BUDGET) {
+    doodleError("Session memory full");
+    return false;
+  }
+  auto *points = static_cast<DoodlePoint *>(realloc(drawing.points, capacity * sizeof(DoodlePoint)));
+  if (!points) {
+    doodleError("Not enough drawing RAM");
+    return false;
+  }
+  drawing.points = points;
+  doodleCapacity += extra;
+  drawing.capacity = capacity;
+  return true;
+}
+
+uint32_t doodleChecksum(const DoodlePoint *points, size_t count) {
+  uint32_t hash = 2166136261u;
+  const auto *bytes = reinterpret_cast<const uint8_t *>(points);
+  for (size_t i = 0; i < count * sizeof(DoodlePoint); i++) hash = (hash ^ bytes[i]) * 16777619u;
+  return hash;
+}
+
+void useSdPins(bool sd);
+bool sdMounted();
+
+DrawStore drawStore() { return static_cast<DrawStore>(config.drawStore); }
+bool drawArtOnly() { return config.drawArea == static_cast<uint8_t>(DrawArea::Art); }
+
+// The microSD card shares its SPI bus with the touch panel: the pins switch for as long as this lives.
+struct DoodleFs {
+  const bool sd = drawStore() == DrawStore::Sd;
+  fs::FS &fs = sd ? static_cast<fs::FS &>(SD) : static_cast<fs::FS &>(LittleFS);
+  DoodleFs() { if (sd) useSdPins(true); }
+  ~DoodleFs() { if (sd) useSdPins(false); }
+};
+
+bool doodleStoreReady() {
+  switch (drawStore()) {
+    case DrawStore::Flash: return doodleStorageReady;
+    case DrawStore::Sd: return sdMounted();
+    default: return false;
+  }
+}
+
+const char *doodleDir() { return drawStore() == DrawStore::Sd ? "/doodles" : ""; }
+
+void doodlePath(char *path, size_t size) {
+  // Prefix IDs retain drawings across append-only catalog expansions, never across reordered entries.
+  const uint32_t id = selectedToken == CUSTOM_INDEX ? 0 : CATALOG_PREFIX_IDS[selectedToken - 1];
+  snprintf(path, size, "%s/d%08X-%04u.bin", doodleDir(), static_cast<unsigned>(id),
+           static_cast<unsigned>(selectedToken));
+}
+
+// Saved doodles are read again from wherever the setting now points; unsaved ink stays in the session.
+void forgetSavedDoodles() {
+  for (Doodle &drawing : doodles) {
+    if (drawing.changed) {
+      drawing.saved = false;
+      continue;
+    }
+    doodleCapacity -= drawing.capacity;
+    free(drawing.points);
+    drawing = Doodle{};
+  }
+}
+
+void loadDoodle() {
+  Doodle &drawing = doodles[selectedToken];
+  if (drawing.loaded) return;
+  drawing.loaded = true;
+  if (!doodleStoreReady()) return;
+  char path[40];
+  doodlePath(path, sizeof(path));
+  DoodleFs store;
+  if (!store.fs.exists(path)) return;
+  File file = store.fs.open(path, "r");
+  DoodleHeader header{};
+  if (!file || file.read(reinterpret_cast<uint8_t *>(&header), sizeof(header)) != sizeof(header) ||
+      header.magic != DOODLE_MAGIC || header.count > DOODLE_MAX_POINTS ||
+      file.size() != sizeof(header) + header.count * sizeof(DoodlePoint)) {
+    drawing.failed = true;
+    doodleError("Cannot read saved drawing");
+    return;
+  }
+  if (header.count && !reserveDoodle(drawing, header.count)) {
+    drawing.loaded = false;
+    return;
+  }
+  bool valid = file.read(reinterpret_cast<uint8_t *>(drawing.points), header.count * sizeof(DoodlePoint)) ==
+               header.count * sizeof(DoodlePoint);
+  valid = valid && doodleChecksum(drawing.points, header.count) == header.checksum;
+  for (size_t i = 0; valid && i < header.count; i++) {
+    const DoodlePoint &point = drawing.points[i];
+    valid = point.x < SCREEN_W && point.y < SCREEN_H && (point.style & 0x60) == 0 &&
+            ((point.style >> 3) & 3) < 3 && (i != 0 || (point.style & DOODLE_START));
+  }
+  if (!valid) {
+    drawing.failed = true;
+    doodleError("Saved drawing is damaged");
+    return;
+  }
+  drawing.count = header.count;
+  drawing.saved = true;
+}
+
+bool saveDoodle() {
+  Doodle &drawing = doodles[selectedToken];
+  if (drawing.failed || !drawing.loaded) {
+    doodleError("Clear unreadable drawing first");
+    return false;
+  }
+  if (drawStore() == DrawStore::Ram) {
+    doodleError("SAVE TO is RAM: see settings");
+    return false;
+  }
+  if (!doodleStoreReady()) {
+    doodleError(drawStore() == DrawStore::Sd ? "No SD card: insert, restart" : "Drawing storage unavailable");
+    return false;
+  }
+  char path[40], temporary[40];
+  doodlePath(path, sizeof(path));
+  snprintf(temporary, sizeof(temporary), "%s/drawing.tmp", doodleDir());
+  DoodleFs store;
+  if (!drawing.count) {
+    if (store.fs.exists(path) && !store.fs.remove(path)) {
+      doodleError("Could not delete saved drawing");
+      return false;
+    }
+  } else {
+    if (store.sd && !store.fs.exists(doodleDir())) store.fs.mkdir(doodleDir());
+    const DoodleHeader header{DOODLE_MAGIC, drawing.count, doodleChecksum(drawing.points, drawing.count)};
+    File file = store.fs.open(temporary, "w");
+    bool written = file && file.write(reinterpret_cast<const uint8_t *>(&header), sizeof(header)) == sizeof(header);
+    if (written) written = file.write(reinterpret_cast<const uint8_t *>(drawing.points),
+                                     drawing.count * sizeof(DoodlePoint)) == drawing.count * sizeof(DoodlePoint);
+    file.close();
+    // LittleFS rename replaces atomically, retaining the previous drawing if writing failed. FAT cannot
+    // rename over a file, so on the card the old one goes first, once the new one is fully written.
+    if (written && store.sd && store.fs.exists(path)) written = store.fs.remove(path);
+    if (!written || !store.fs.rename(temporary, path)) {
+      doodleError("Save failed / storage full");
+      if (store.fs.exists(temporary) && !store.fs.remove(temporary))
+        Serial.println("drawing: could not remove incomplete temporary file");
+      return false;
+    }
+  }
+  drawing.saved = drawing.count != 0;
+  drawing.changed = false;
+  doodleMessage = !drawing.saved ? "Saved drawing removed" : store.sd ? "Saved to the SD card" : "Saved to flash";
+  return true;
+}
+
+int doodleMap(int value, const int *from, const int *to, size_t count) {
+  for (size_t i = 1; i < count; i++) {
+    if (value <= from[i]) {
+      const int span = from[i] - from[i - 1];
+      return to[i - 1] + ((value - from[i - 1]) * (to[i] - to[i - 1]) + span / 2) / span;
+    }
+  }
+  return to[count - 1];
+}
+
+int doodleX(int x, bool toScreen) {
+  const int canonical[] = {0, FULL_GEO.artX, FULL_GEO.artX + FULL_GEO.artW - 1, SCREEN_W - 1};
+  const int local[] = {G.cardX, G.artX, G.artX + G.artW - 1, G.cardX + G.cardW - 1};
+  return doodleMap(x, toScreen ? canonical : local, toScreen ? local : canonical, 4);
+}
+
+int doodleY(int y, bool toScreen) {
+  const int canonical[] = {0, FULL_GEO.artY, FULL_GEO.artY + FULL_GEO.artH,
+                            FULL_GEO.typeY, FULL_GEO.textY, SCREEN_H - 1};
+  const int local[] = {G.cardY, G.artY, G.artY + G.artH, G.typeY, G.textY, G.cardY + G.cardH - 1};
+  return doodleMap(y, toScreen ? canonical : local, toScreen ? local : canonical, 6);
+}
+
+void drawDoodleSegment(TFT_eSPI &out, const DoodlePoint &from, const DoodlePoint &to) {
+  int x = doodleX(from.x, true), y = doodleY(from.y, true);
+  const int endX = doodleX(to.x, true), endY = doodleY(to.y, true);
+  const int dx = abs(endX - x), dy = -abs(endY - y);
+  const int sx = x < endX ? 1 : -1, sy = y < endY ? 1 : -1;
+  int error = dx + dy;
+  const int radius = max(1, DOODLE_RADII[(to.style >> 3) & 3] * G.cardW / SCREEN_W);
+  const uint16_t color = DOODLE_COLORS[to.style & 7];
+  while (true) {
+    out.fillCircle(x, y, radius, color);
+    if (x == endX && y == endY) break;
+    const int twice = 2 * error;
+    if (twice >= dy) { error += dy; x += sx; }
+    if (twice <= dx) { error += dx; y += sy; }
+  }
+}
+
+void drawDoodle(TFT_eSPI &out) {
+  const Doodle &drawing = doodles[selectedToken];
+  for (size_t i = 0; i < drawing.count; i++) {
+    const DoodlePoint &point = drawing.points[i];
+    drawDoodleSegment(out, i == 0 || (point.style & DOODLE_START) ? point : drawing.points[i - 1], point);
+  }
+}
+
+constexpr int ERASER_REACH = 8;  // Screen pixels beyond the edge of a stroke that still pick it.
+
+// Removes the topmost stroke passing near the screen point; false when there is none.
+bool eraseStrokeAt(int x, int y) {
+  Doodle &drawing = doodles[selectedToken];
+  int hit = -1, start = 0;
+  for (int i = 0; i < drawing.count; i++) {
+    const DoodlePoint &point = drawing.points[i];
+    if (point.style & DOODLE_START) start = i;
+    const DoodlePoint &from = point.style & DOODLE_START ? point : drawing.points[i - 1];
+    const int ax = doodleX(from.x, true), ay = doodleY(from.y, true);
+    const int bx = doodleX(point.x, true), by = doodleY(point.y, true);
+    const long dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+    long t = length ? ((x - ax) * dx + (y - ay) * dy) * 1024 / length : 0;
+    t = constrain(t, 0L, 1024L);
+    const long nearX = ax + dx * t / 1024 - x, nearY = ay + dy * t / 1024 - y;
+    const long reach = ERASER_REACH + max(1, DOODLE_RADII[(point.style >> 3) & 3] * G.cardW / SCREEN_W);
+    if (nearX * nearX + nearY * nearY <= reach * reach) hit = start;
+  }
+  if (hit < 0) return false;
+  int end = hit + 1;
+  while (end < drawing.count && !(drawing.points[end].style & DOODLE_START)) end++;
+  memmove(drawing.points + hit, drawing.points + end, (drawing.count - end) * sizeof(DoodlePoint));
+  drawing.count -= end - hit;
+  drawing.changed = true;
+  return true;
+}
+
 Token tokenAt(size_t index) {
   if (index != CUSTOM_INDEX) return CATALOG[index - 1];
   return {custom.name, custom.type, custom.text, custom.hasPT, custom.power, custom.toughness,
@@ -548,7 +845,7 @@ Layout layout() {
 }
 
 bool fullBleed() {
-  return layout() != Layout::Classic;
+  return screen != Screen::Drawing && screen != Screen::DrawingTools && layout() != Layout::Classic;
 }
 
 bool controlsVisible() {
@@ -646,11 +943,13 @@ void loadState() {
   // Settings are kept apart from the catalog check: they stay valid when the catalog changes.
   Config saved = DEFAULT_CONFIG;
   const size_t configLength = prefs.getBytesLength("config");
-  if (configLength == sizeof(saved) || configLength == CONFIG_V2_SIZE || configLength == CONFIG_V1_SIZE) {
+  if (configLength == sizeof(saved) || configLength == CONFIG_V3_SIZE || configLength == CONFIG_V2_SIZE ||
+      configLength == CONFIG_V1_SIZE) {
     prefs.getBytes("config", &saved, configLength);
     if (saved.brightness >= 1 && saved.brightness <= BRIGHTNESS_LEVELS && saved.timeout < TIMEOUT_COUNT &&
         saved.layout < LAYOUT_COUNT && saved.tone < TONE_LEVELS && saved.flipped <= 1 &&
-        saved.gammaMode < GAMMA_COUNT) {
+        saved.gammaMode < GAMMA_COUNT && saved.drawArea < 2 && saved.drawOpen < DRAW_OPTION_COUNT &&
+        saved.drawStore < DRAW_OPTION_COUNT) {
       config = saved;
     }
   }
@@ -1132,6 +1431,8 @@ const char *sdArtLabel() {
   }
 }
 
+bool sdMounted() { return sdArt != SdArt::NoCard; }
+
 // The last art file read from the card, kept so redrawing the card does not read it again.
 struct SdArtCache {
   size_t token = 0;
@@ -1355,10 +1656,11 @@ void drawArt() {
   }
 
   // A single token (or none) leaves the art clear, except briefly after the quantity changes.
-  const bool showCount = state.count > 1 || countFlash;
+  const bool editingDrawing = screen == Screen::Drawing;
+  const bool showCount = !editingDrawing && (state.count > 1 || countFlash);
   out.setTextDatum(TC_DATUM);
   if (showCount) drawOutlined(out, "IN PLAY", centerX, G.artY + (fullBleed() ? 5 : 6), 2, PARCHMENT);
-  if (positionVisible) {
+  if (positionVisible && !editingDrawing) {
     String position = String(selectedToken + 1) + "/" + String(TOKEN_COUNT);
     if (fullBleed()) {
       drawOutlined(out, position, centerX, G.artY + 22, 1, PARCHMENT);
@@ -1370,10 +1672,13 @@ void drawArt() {
   out.setTextDatum(MC_DATUM);
   if (showCount) drawOutlined(out, String(state.count), centerX, G.countY, 7, PARCHMENT);
 
-  if (state.count > 1) {
+  if (state.count > 1 && !editingDrawing) {
     drawTapGroup(out, G.groupLeftX, state.count - state.tapped, false);
     drawTapGroup(out, G.groupRightX, state.tapped, true);
   }
+  if (!composed) display.setViewport(G.artX, G.artY, G.artW, G.artH, false);
+  drawDoodle(out);
+  if (!composed) display.resetViewport();
   if (fullBleed() && controlsVisible()) drawOverlayControls(out, artColor, composed);
 
   if (composed) {
@@ -1549,6 +1854,17 @@ void drawCardValues() {
   drawArt();
   drawTextBox();
   drawPT();
+  // Ink outside the art only shows when doodles may cover the whole card; it stays stored either way.
+  if (drawArtOnly()) return;
+  display.setViewport(G.cardX, G.cardY, G.cardW, G.artY - G.cardY, false);
+  drawDoodle(display);
+  display.setViewport(G.cardX, G.artY + G.artH, G.cardW, G.cardY + G.cardH - G.artY - G.artH, false);
+  drawDoodle(display);
+  display.setViewport(G.cardX, G.artY, G.artX - G.cardX, G.artH, false);
+  drawDoodle(display);
+  display.setViewport(G.artX + G.artW, G.artY, G.cardX + G.cardW - G.artX - G.artW, G.artH, false);
+  drawDoodle(display);
+  display.resetViewport();
 }
 
 // Long type lines (Enchantment Artifact Creature - Golem) wrap onto two lines of the small font.
@@ -1633,9 +1949,43 @@ void drawControls() {
   drawButton(4, ">", INK);
 }
 
+void drawDoodlePalette() {
+  display.fillRoundRect(PALETTE_X, PALETTE_Y, PALETTE_W, PALETTE_H, 6, BACKGROUND);
+  display.drawRoundRect(PALETTE_X, PALETTE_Y, PALETTE_W, PALETTE_H, 6, HINT);
+  for (int i = 0; i < 8; i++) {
+    const int x = PALETTE_X + PALETTE_COLOR_W / 2 + i * PALETTE_COLOR_W, y = PALETTE_Y + 23;
+    display.fillCircle(x, y, 10, DOODLE_COLORS[i]);
+    display.drawCircle(x, y, 13, !doodleEraser && doodleColor == i ? HIGHLIGHT : HINT);
+  }
+  display.setTextDatum(MC_DATUM);
+  const uint16_t dot = doodleEraser || DOODLE_COLORS[doodleColor] == TFT_BLACK ? INK : DOODLE_COLORS[doodleColor];
+  for (int i = 0; i < 4; i++) {
+    const int x = PALETTE_X + PALETTE_BRUSH_W / 2 + i * PALETTE_BRUSH_W, y = PALETTE_SPLIT_Y + 20;
+    const bool selected = i == 3 ? doodleEraser : !doodleEraser && doodleBrush == i;
+    display.drawRoundRect(x - 25, y - 16, 50, 32, 5, selected ? HIGHLIGHT : HINT);
+    if (i < 3) {
+      display.fillCircle(x, y, DOODLE_RADII[i] + 1, dot);
+    } else {
+      display.setTextColor(selected ? HIGHLIGHT : INK, BACKGROUND);
+      display.drawString("ERASE", x, y, 1);
+    }
+  }
+}
+
 void drawScreen() {
+  loadDoodle();
   display.fillScreen(BACKGROUND);
   drawCard();
+  if (screen == Screen::Drawing) {
+    drawButton(0, "BACK", INK);
+    drawButton(1, doodleEraser ? "ERASE" : "PEN",
+               doodleEraser || DOODLE_COLORS[doodleColor] == TFT_BLACK ? HINT : DOODLE_COLORS[doodleColor]);
+    drawButton(2, "UNDO", INK);
+    drawButton(3, "CLEAR", INK);
+    drawButton(4, "SAVE", drawStore() == DrawStore::Ram ? HINT : HIGHLIGHT);
+    if (doodlePalette) drawDoodlePalette();
+    return;
+  }
   drawControls();
   if (!fullBleed()) {
     // The card leaves a margin on each side of the top edge for the settings and search icons.
@@ -1969,6 +2319,47 @@ void drawGammaTips() {
   for (int i = 0; i < 4; i++) display.drawString(TIPS[i], SCREEN_W / 2, SET_GAMMA_TIPS_Y + i * 16, 2);
 }
 
+// A row of options, one of them chosen, like the SCREEN panel.
+void drawChoicePanel(int y, const char *title, const char *const *labels, int count, int selected) {
+  drawSettingsPanel(y, SET_PANEL_H, title);
+  const int rowY = y + SET_ROW_TOP;
+  const int w = (SET_W - 4 - 4 * count) / count;
+  for (int i = 0; i < count; i++) {
+    const int x = SET_X + 4 + i * (w + 4);
+    const uint16_t fill = i == selected ? HIGHLIGHT : PANEL_SELECTED;
+    display.fillRoundRect(x, rowY, w, SET_ROW_H, 6, fill);
+    display.setTextDatum(MC_DATUM);
+    display.setTextColor(i == selected ? TFT_BLACK : INK, fill);
+    display.drawString(labels[i], x + w / 2, rowY + SET_ROW_H / 2, 2);
+  }
+}
+
+int choiceAt(int x, int count) {
+  return constrain((x - SET_X - 4) * count / (SET_W - 4), 0, count - 1);
+}
+
+void drawDoodlePanels() {
+  static const char *const AREAS[] = {"ART ONLY", "WHOLE CARD"};
+  static const char *const OPENERS[] = {"BUTTON", "HOLD ART", "BOTH"};
+  static const char *const STORES[] = {"RAM", "FLASH", "SD CARD"};
+  drawChoicePanel(SET_DRAW_AREA_Y, "DOODLE AREA", AREAS, 2, config.drawArea);
+  drawChoicePanel(SET_DRAW_OPEN_Y, "START DRAWING WITH", OPENERS, 3, config.drawOpen);
+  drawChoicePanel(SET_DRAW_STORE_Y, "SAVE DOODLES TO", STORES, 3, config.drawStore);
+
+  static const char *const OPEN_TIPS[] = {"DRAW button on the counters page.", "Hold the art for a second.",
+                                          "Hold the art, or counters DRAW."};
+  static const char *const STORE_TIPS[] = {"RAM: doodles are gone on restart.", "FLASH: kept inside the board.",
+                                           "SD: kept in /doodles on the card."};
+  const bool noCard = drawStore() == DrawStore::Sd && !sdMounted();
+  display.fillRect(0, SET_DRAW_TIPS_Y, SCREEN_W, 34, BACKGROUND);
+  display.setTextDatum(TC_DATUM);
+  display.setTextColor(HINT, BACKGROUND);
+  display.drawString(OPEN_TIPS[config.drawOpen], SCREEN_W / 2, SET_DRAW_TIPS_Y, 2);
+  display.setTextColor(noCard ? HIGHLIGHT : HINT, BACKGROUND);
+  display.drawString(noCard ? "No SD card: insert it, restart." : STORE_TIPS[config.drawStore], SCREEN_W / 2,
+                     SET_DRAW_TIPS_Y + 16, 2);
+}
+
 void drawSettings() {
   display.fillScreen(BACKGROUND);
   display.setTextDatum(MC_DATUM);
@@ -1989,12 +2380,15 @@ void drawSettings() {
     drawTonePanel();
     drawScreenPanel();
     drawScreenTips();
-  } else {
+  } else if (settingsPage == 2) {
     drawGammaPanel();
     drawRampPanel();
     drawGammaTips();
+  } else {
+    drawDoodlePanels();
   }
   drawButton(0, "<", INK);
+  drawButton(1, "DRAW", HIGHLIGHT);
   drawButton(2, "BACK", INK);
   drawButton(4, ">", INK);
 }
@@ -2210,8 +2604,70 @@ void drawCounters() {
   for (int row = counterPage * ROWS_PER_PAGE; row < counterRowCount(); row++) drawCounterRow(row);
 
   drawButton(0, "<", INK);
+  if (config.drawOpen != static_cast<uint8_t>(DrawOpen::Hold)) drawButton(1, "DRAW", HIGHLIGHT);
   drawButton(2, "BACK", INK);
   drawButton(4, ">", INK);
+}
+
+void drawDrawingTools() {
+  display.fillScreen(BACKGROUND);
+  display.setTextDatum(TC_DATUM);
+  display.setTextColor(INK, BACKGROUND);
+  display.drawString("DOODLE TOOLS", SCREEN_W / 2, 8, 2);
+  if (doodlePrompt != DoodlePrompt::None) {
+    const bool clear = doodlePrompt == DoodlePrompt::Clear;
+    display.drawString(clear ? "Clear this token's drawing?" : "Initialize drawing storage?", SCREEN_W / 2, 60, 2);
+    display.setTextColor(HINT, BACKGROUND);
+    display.drawString(clear ? "Temporary until you press SAVE." : "Formats only the drawing area.", SCREEN_W / 2, 94, 1);
+    display.drawString(clear ? "Saved ink returns after reboot" : "Saved drawings there are erased.", SCREEN_W / 2, 112, 1);
+    display.drawString(clear ? "unless you save the empty drawing." : "Token counts and SD are untouched.", SCREEN_W / 2, 130, 1);
+    drawButton(0, "CANCEL", INK);
+    drawButton(4, clear ? "CLEAR" : "INIT", HIGHLIGHT);
+    return;
+  }
+  display.setTextColor(HINT, BACKGROUND);
+  display.drawString("COLOR", SCREEN_W / 2, 38, 1);
+  for (int i = 0; i < 8; i++) {
+    const int x = 30 + (i % 4) * 60, y = 70 + (i / 4) * 44;
+    display.fillCircle(x, y, 16, DOODLE_COLORS[i]);
+    display.drawCircle(x, y, 19, doodleColor == i ? HIGHLIGHT : HINT);
+  }
+  display.setTextColor(HINT, BACKGROUND);
+  display.drawString("BRUSH SIZE / ERASER", SCREEN_W / 2, 145, 1);
+  for (int i = 0; i < 4; i++) {
+    const int x = 30 + i * 60;
+    const bool selected = i == 3 ? doodleEraser : !doodleEraser && doodleBrush == i;
+    display.drawRoundRect(x - 25, 163, 50, 36, 5, selected ? HIGHLIGHT : HINT);
+    if (i < 3) {
+      display.fillCircle(x, 181, DOODLE_RADII[i], INK);
+    } else {
+      display.fillRoundRect(x - 12, 168, 24, 12, 3, TFT_PINK);
+      display.setTextColor(selected ? HIGHLIGHT : INK, BACKGROUND);
+      display.drawString("ERASE", x, 184, 1);
+    }
+  }
+  const Doodle &drawing = doodles[selectedToken];
+  display.setTextColor(INK, BACKGROUND);
+  display.drawString(drawing.changed ? "SESSION CHANGES (not saved)" :
+                     drawing.saved ? "SAVED DRAWING" : "TEMPORARY DRAWING", SCREEN_W / 2, 214, 1);
+  display.setTextColor(HINT, BACKGROUND);
+  display.drawString("BACK keeps ink for this session.", SCREEN_W / 2, 232, 1);
+  switch (drawStore()) {
+    case DrawStore::Ram:
+      display.drawString("SAVE TO is RAM: lost on restart.", SCREEN_W / 2, 246, 1);
+      break;
+    case DrawStore::Flash:
+      display.drawString("SAVE keeps it in flash.", SCREEN_W / 2, 246, 1);
+      break;
+    case DrawStore::Sd:
+      display.drawString(sdMounted() ? "SAVE keeps it on the SD card." : "No SD card: insert, restart.",
+                         SCREEN_W / 2, 246, 1);
+      break;
+  }
+  display.setTextColor(HIGHLIGHT, BACKGROUND);
+  display.drawString(doodleMessage, SCREEN_W / 2, 263, 1);
+  drawButton(0, "BACK", INK);
+  drawButton(4, "SAVE", drawStore() == DrawStore::Ram ? HINT : HIGHLIGHT);
 }
 
 // Every screen change waits for the finger to lift, so the press that caused it cannot also hit a
@@ -2223,9 +2679,38 @@ void navigate(Screen next) {
 
 void showCard() {
   navigate(Screen::Card);
+  if (G.cardW != (fullBleed() ? FULL_GEO.cardW : CLASSIC_GEO.cardW)) applyLayout();
   overlaysVisible = true;
   validateMode();
   drawScreen();
+}
+
+void openDrawing() {
+  doodleDown = false;
+  doodlePalette = false;
+  doodlePrompt = DoodlePrompt::None;
+  doodleMessage = "";
+  loadDoodle();
+  navigate(Screen::Drawing);
+  applyLayout();
+  drawScreen();
+}
+
+void openDrawingTools(DoodlePrompt prompt = DoodlePrompt::None) {
+  doodleDown = false;
+  doodlePalette = false;
+  doodlePrompt = prompt;
+  navigate(Screen::DrawingTools);
+  drawDrawingTools();
+}
+
+void requestDoodleSave() {
+  if (drawStore() == DrawStore::Flash && !doodleStorageReady) {
+    openDrawingTools(DoodlePrompt::Initialize);
+    return;
+  }
+  saveDoodle();
+  openDrawingTools();
 }
 
 void openCounters() {
@@ -2487,7 +2972,12 @@ void handleCardTouch(int x, int y) {
     return;
   }
   if (x >= G.artX && x < G.artX + G.artW && y >= G.artY && y < G.artY + G.artH) {
-    toggleAllTapped();
+    if (config.drawOpen == static_cast<uint8_t>(DrawOpen::Button)) {
+      toggleAllTapped();
+    } else {
+      artHoldPending = true;
+      artHoldAt = millis();
+    }
     return;
   }
   // The text box opens the counters. The custom token keeps it for its editor, except for the strip
@@ -2609,12 +3099,25 @@ void setGamma(int index) {
   scheduleSave();
 }
 
+void setDrawOption(uint8_t &option, int value) {
+  if (option == value) return;
+  option = value;
+  // Saved ink is read again from the new place; unsaved session ink stays.
+  if (&option == &config.drawStore) forgetSavedDoodles();
+  drawDoodlePanels();
+  awaitRelease = true;
+  scheduleSave();
+}
+
 void handleSettingsTouch(int x, int y) {
   if (y >= BAR_Y - 4) {
     switch (min(x / BUTTON_STEP, 4)) {
       case 0:
         settingsPage = (settingsPage + SETTINGS_PAGES - 1) % SETTINGS_PAGES;
         drawSettings();
+        break;
+      case 1:
+        openDrawing();
         break;
       case 2:
         closeSettings();
@@ -2630,6 +3133,16 @@ void handleSettingsTouch(int x, int y) {
   auto inPanel = [y](int top, int height) { return y >= top + 14 && y < top + height; };
   const int minusEnd = SET_X + 4 + SET_STEP_W + 4;
   const int plusStart = SET_X + SET_W - 4 - SET_STEP_W - 4;
+  if (settingsPage == 3) {
+    if (inPanel(SET_DRAW_AREA_Y, SET_PANEL_H)) {
+      setDrawOption(config.drawArea, choiceAt(x, 2));
+    } else if (inPanel(SET_DRAW_OPEN_Y, SET_PANEL_H)) {
+      setDrawOption(config.drawOpen, choiceAt(x, DRAW_OPTION_COUNT));
+    } else if (inPanel(SET_DRAW_STORE_Y, SET_PANEL_H)) {
+      setDrawOption(config.drawStore, choiceAt(x, DRAW_OPTION_COUNT));
+    }
+    return;
+  }
   if (settingsPage == 2) {
     if (inPanel(SET_GAMMA_Y, SET_PANEL_H)) {
       if (x < minusEnd) setGamma(config.gammaMode - 1);
@@ -2746,6 +3259,9 @@ void handleCountersTouch(int x, int y) {
         counterPage = (counterPage + pages - 1) % pages;
         drawCounters();
         break;
+      case 1:
+        if (config.drawOpen != static_cast<uint8_t>(DrawOpen::Hold)) openDrawing();
+        break;
       case 2:
         showCard();
         break;
@@ -2791,6 +3307,169 @@ void handleCountersTouch(int x, int y) {
   scheduleSave();
 }
 
+void handleDrawingTouch(int x, int y) {
+  if (y >= BAR_Y - 4) {
+    if (doodleDown) {
+      doodleDown = false;
+      awaitRelease = true;
+      return;
+    }
+    awaitRelease = true;
+    const int button = min(x / BUTTON_STEP, 4);
+    if (doodlePalette) {
+      doodlePalette = false;
+      if (button == 1) {
+        drawScreen();
+        return;
+      }
+    }
+    switch (button) {
+      case 0:
+        showCard();
+        break;
+      case 1:
+        doodlePalette = true;
+        drawDoodlePalette();
+        break;
+      case 2: {
+        Doodle &drawing = doodles[selectedToken];
+        if (drawing.count) {
+          do { drawing.count--; } while (drawing.count && !(drawing.points[drawing.count].style & DOODLE_START));
+          drawing.changed = true;
+        }
+        drawScreen();
+        break;
+      }
+      case 3:
+        openDrawingTools(DoodlePrompt::Clear);
+        break;
+      case 4:
+        requestDoodleSave();
+        break;
+    }
+    return;
+  }
+  if (doodlePalette) {
+    awaitRelease = true;
+    doodlePalette = false;
+    if (x >= PALETTE_X && x < PALETTE_X + PALETTE_W && y >= PALETTE_Y && y < PALETTE_Y + PALETTE_H) {
+      if (y < PALETTE_SPLIT_Y) {
+        doodleColor = min((x - PALETTE_X) / PALETTE_COLOR_W, 7);
+        doodleEraser = false;
+      } else {
+        const int item = min((x - PALETTE_X) / PALETTE_BRUSH_W, 3);
+        doodleEraser = item == 3;
+        if (!doodleEraser) doodleBrush = item;
+      }
+    }
+    drawScreen();
+    return;
+  }
+  const bool artOnly = drawArtOnly();
+  const int left = artOnly ? G.artX : G.cardX, top = artOnly ? G.artY : G.cardY;
+  const int width = artOnly ? G.artW : G.cardW, height = artOnly ? G.artH : G.cardH;
+  if (x < left || x >= left + width || y < top || y >= top + height) {
+    doodleDown = false;
+    awaitRelease = true;
+    return;
+  }
+  Doodle &drawing = doodles[selectedToken];
+  if (!drawing.loaded || drawing.failed) {
+    doodleError("Clear unreadable drawing first");
+    openDrawingTools();
+    return;
+  }
+  if (doodleEraser) {
+    if (eraseStrokeAt(x, y)) drawScreen();
+    return;
+  }
+  const DoodlePoint point{static_cast<uint8_t>(doodleX(x, false)),
+                          static_cast<uint8_t>(doodleColor | (doodleBrush << 3) | (doodleDown ? 0 : DOODLE_START)),
+                          static_cast<uint16_t>(doodleY(y, false))};
+  if (doodleDown && drawing.count) {
+    const DoodlePoint &previous = drawing.points[drawing.count - 1];
+    if (abs(static_cast<int>(point.x) - previous.x) + abs(static_cast<int>(point.y) - previous.y) < 2) return;
+  }
+  if (drawing.count == DOODLE_MAX_POINTS) {
+    doodleError("Drawing full: Undo or Clear");
+    openDrawingTools();
+    return;
+  }
+  if (drawing.count == drawing.capacity &&
+      !reserveDoodle(drawing, min(DOODLE_MAX_POINTS, static_cast<uint16_t>(max(64, drawing.capacity * 2))))) {
+    openDrawingTools();
+    return;
+  }
+  const DoodlePoint &previous = doodleDown && drawing.count ? drawing.points[drawing.count - 1] : point;
+  display.setViewport(left, top, width, height, false);
+  drawDoodleSegment(display, previous, point);
+  display.resetViewport();
+  drawing.points[drawing.count++] = point;
+  drawing.changed = true;
+  doodleDown = true;
+}
+
+void handleDrawingToolsTouch(int x, int y) {
+  if (y >= BAR_Y - 4) {
+    const int button = min(x / BUTTON_STEP, 4);
+    if (doodlePrompt != DoodlePrompt::None) {
+      if (button == 0) {
+        doodlePrompt = DoodlePrompt::None;
+        awaitRelease = true;
+        drawDrawingTools();
+      } else if (button == 4) {
+        if (doodlePrompt == DoodlePrompt::Clear) {
+          Doodle &drawing = doodles[selectedToken];
+          doodleCapacity -= drawing.capacity;
+          free(drawing.points);
+          const bool saved = drawing.saved;
+          drawing = Doodle{};
+          drawing.loaded = true;
+          drawing.changed = true;
+          drawing.saved = saved;
+          doodleMessage = "Cleared for this session";
+        } else {
+          LittleFS.end();
+          doodleStorageReady = LittleFS.format() && LittleFS.begin(false, "/littlefs", 3, "spiffs");
+          if (!doodleStorageReady) {
+            doodleError("Could not initialize storage");
+          } else {
+            for (Doodle &drawing : doodles) {
+              drawing.saved = false;
+              if (drawing.count) drawing.changed = true;
+            }
+            saveDoodle();
+          }
+        }
+        doodlePrompt = DoodlePrompt::None;
+        awaitRelease = true;
+        drawDrawingTools();
+      }
+      return;
+    }
+    if (button == 0) {
+      navigate(Screen::Drawing);
+      drawScreen();
+    } else if (button == 4) {
+      requestDoodleSave();
+    }
+    return;
+  }
+  if (doodlePrompt != DoodlePrompt::None) return;
+  if (y >= 48 && y < 136) {
+    doodleColor = min(x / 60, 3) + (y >= 92 ? 4 : 0);
+    doodleEraser = false;
+  } else if (y >= 163 && y < 199) {
+    const int item = min(x / 60, 3);
+    doodleEraser = item == 3;
+    if (!doodleEraser) doodleBrush = item;
+  } else {
+    return;
+  }
+  awaitRelease = true;
+  drawDrawingTools();
+}
+
 int clampCoordinate(long value, int maximum) {
   if (value < 0) return 0;
   if (value >= maximum) return maximum - 1;
@@ -2800,10 +3479,23 @@ int clampCoordinate(long value, int maximum) {
 void handleTouch() {
   if (!touch.touched()) {
     awaitRelease = false;
+    doodleDown = false;
+    if (artHoldPending) {
+      // Let go before the hold opened drawing mode: an ordinary tap on the art.
+      artHoldPending = false;
+      if (screen == Screen::Card) toggleAllTapped();
+    }
     return;
   }
   const uint32_t now = millis();
   lastActivityAt = now;
+  if (artHoldPending) {
+    if (now - artHoldAt >= DRAW_HOLD_MS) {
+      artHoldPending = false;
+      openDrawing();
+    }
+    return;
+  }
   if (!screenOn) {
     // The touch that wakes the screen does nothing else, except bring back hidden controls.
     if (screen == Screen::Card && !controlsVisible()) {
@@ -2816,7 +3508,7 @@ void handleTouch() {
     lastTouchAt = now;
     return;
   }
-  if (awaitRelease || now - lastTouchAt < TOUCH_REPEAT_MS) return;
+  if (awaitRelease || now - lastTouchAt < (screen == Screen::Drawing ? 20u : TOUCH_REPEAT_MS)) return;
 
   TS_Point point = touch.getPoint();
   // Touch calibration is in landscape (rotation 1); convert to the portrait display.
@@ -2830,7 +3522,8 @@ void handleTouch() {
     y = SCREEN_H - 1 - y;
   }
   lastTouchAt = now;
-  Serial.printf("touch raw=%d,%d z=%d -> %d,%d\n", point.x, point.y, point.z, x, y);
+  if (screen != Screen::Drawing)
+    Serial.printf("touch raw=%d,%d z=%d -> %d,%d\n", point.x, point.y, point.z, x, y);
 
   if (screen == Screen::Card && !controlsVisible()) {
     // The first tap on a bare card only brings the controls back.
@@ -2858,6 +3551,12 @@ void handleTouch() {
       break;
     case Screen::Counters:
       handleCountersTouch(x, y);
+      break;
+    case Screen::Drawing:
+      handleDrawingTouch(x, y);
+      break;
+    case Screen::DrawingTools:
+      handleDrawingToolsTouch(x, y);
       break;
   }
 }
@@ -2908,6 +3607,8 @@ void setup() {
   touch.begin(touchSpi);
   touch.setRotation(1);
   initSdArt();
+  doodleStorageReady = LittleFS.begin(false, "/littlefs", 3, "spiffs");
+  if (!doodleStorageReady) Serial.println("drawing storage not mounted; SAVE can initialize it with confirmation");
   showPosition();
   showCard();
   lastActivityAt = millis();

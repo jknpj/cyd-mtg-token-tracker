@@ -11,11 +11,12 @@ Um rastreador offline de tokens de Magic: The Gathering para o **CYD ESP32-2432S
 | **455 entradas + Custom** | Tokens e emblemas cobrindo 198 listas de precons de Commander na snapshot de 24/10/2026 |
 | **Tres layouts** | Controles no Classic, Overlay em tela cheia ou Card only sem controles sobre a carta |
 | **Marcadores e P/T** | +1/+1, marcadores com nome, de habilidade e bonus "para cada" reconhecidos |
+| **Desenhe nos tokens** | Desenho na arte ou na carta inteira: oito cores, tres pinceis, borracha, desfazer e salvamento na RAM, flash ou microSD |
 | **Busca rapida** | Nome, tipo, texto, cor e P/T pelo teclado na tela |
 | **Arte opcional no microSD** | JPEGs de maior qualidade, com retorno automatico para a arte embutida |
 | **Estado persistente** | Quantidades, marcadores, token personalizado e preferencias de tela salvos na flash |
 
-[Tour da interface](#tour-da-interface) · [Inicio rapido](#inicio-rapido) · [Controles](#controles) · [microSD](#arte-em-alta-qualidade-no-microsd) · [Configuracoes](#configuracoes) · [Catalogo e desenvolvimento](#catalogo-de-tokens)
+[Tour da interface](#tour-da-interface) · [Inicio rapido](#inicio-rapido) · [Controles](#controles) · [Desenhos](#modo-de-desenho) · [microSD](#arte-em-alta-qualidade-no-microsd) · [Configuracoes](#configuracoes) · [Catalogo e desenvolvimento](#catalogo-de-tokens)
 
 ## Tour da interface
 
@@ -98,6 +99,44 @@ O P/T exibido ja soma os marcadores e os modificadores. Tokens sem P/T (artefato
 
 Tokens com P/T variavel preservam os simbolos impressos (`*/*`, `*/1+*` etc.), em vez de fingir que sao 0/0. Seus modificadores aparecem junto do simbolo; o rastreador nao conhece zonas como cemiterios ou a vida dos jogadores para resolver essas habilidades sozinho. Cragflame e um Equipment: seu texto aparece na carta, mas equipar e aplicar seu bonus a outra criatura continuam sendo acoes manuais.
 
+## Modo de desenho
+
+Bigodes sao bem-vindos. **Segure a arte por cerca de um segundo**, ou abra os **Contadores** e toque em **DRAW**, para decorar o token selecionado. O **DRAW** das **Configuracoes** tambem sempre funciona. A pagina 4 das configuracoes escolhe [como o desenho comeca, onde a tinta vai e onde ela e salva](#pagina-4-desenhos).
+
+<img src="docs/screenshots/drawing.png" alt="Modo de desenho com rosto e bigode desenhados sobre um token personalizado e botoes Back, Pen, Undo, Clear e Save" width="240"> <img src="docs/screenshots/drawing-palette.png" alt="Pop-up do PEN sobre o desenho com oito cores, tres pinceis e a borracha" width="240">
+
+A carta inteira cabe acima de uma barra separada, permitindo desenhar sem encostar nos controles do jogo. Com **DOODLE AREA** em `WHOLE CARD` (o padrao) da para desenhar na arte, nome, moldura e texto; com `ART ONLY`, a tinta fica so na arte e o que ja foi desenhado fora dela fica oculto (nao apagado) ate voltar a opcao. Durante o desenho, os indicadores de quantidade e virados ficam ocultos; os valores do jogo nao mudam. Fora desse modo, o desenho continua visivel nos tres layouts e os toques normais continuam funcionando.
+
+| Botao | Acao |
+| --- | --- |
+| **BACK** | Voltar para a carta, mantendo o desenho desse token durante a sessao |
+| **PEN** | Abrir um pop-up sobre o desenho com oito cores, tres tamanhos de pincel e a borracha (**ERASE**). Um toque escolhe e fecha; toque em qualquer outro lugar (ou em **PEN** de novo) para fechar sem mudar nada. O botao mostra **ERASE** enquanto a borracha estiver ativa |
+| **UNDO** | Remover o ultimo traco completo; um toque isolado tambem conta como traco |
+| **CLEAR** | Confirmar a limpeza do desenho atual desse token |
+| **SAVE** | Manter o desenho depois de reiniciar, na flash ou no microSD (veja **SAVE DOODLES TO**) |
+
+**Borracha:** com **ERASE** selecionada, toque num traco para remover o traco inteiro (o de cima, sob o dedo); arraste para apagar varios. Escolher uma cor ou pincel volta para a caneta.
+
+**Ha suporte a desenhos temporarios e salvos.** Cada token, inclusive o `Custom`, tem seu proprio desenho. Trocar de token nao descarta o desenho da sessao. Reiniciar descarta as edicoes nao salvas e restaura a ultima versao salva explicitamente, se houver. Limpar e apagar tambem sao temporarios ate tocar em **SAVE**: salve um desenho vazio para remover a versao armazenada.
+
+Onde o **SAVE** grava depende de **SAVE DOODLES TO**:
+
+| Opcao | Onde | Observacoes |
+| --- | --- | --- |
+| `RAM` | Em lugar nenhum | Os desenhos duram ate a placa reiniciar; o **SAVE** so explica isso |
+| `FLASH` (padrao) | Particao `spiffs` de 768 KiB, LittleFS | Nao precisa de cartao |
+| `SD CARD` | Pasta `/doodles` no microSD | O cartao precisa estar no slot quando a placa liga |
+
+Trocar essa opcao rele os desenhos salvos do novo lugar; a tinta nao salva da sessao continua na tela e pode ser salva la.
+
+No primeiro salvamento na flash, se o armazenamento dos desenhos nao estiver montado, o firmware pede confirmacao antes de inicializa-lo. **INIT formata apenas a particao separada de 768 KiB dos desenhos** (chamada `spiffs`, usada aqui com LittleFS), nunca a NVS dos tokens ou o microSD. Cancele para continuar desenhando temporariamente. Se um sistema de arquivos que ja funcionava ficar indisponivel, inicializa-lo apagara os desenhos daquela particao: cancele se precisar recupera-los. Um arquivo de desenho danificado gera um aviso em vez de ser sobrescrito silenciosamente; use **CLEAR** para substitui-lo explicitamente.
+
+Os desenhos usam tracos compactos, nao bitmaps de tela inteira. Cada token aceita ate **1.024 pontos amostrados**, com um **orcamento de 32 KiB para os buffers de pontos** compartilhado pela sessao; desenhos salvos sem alteracoes podem sair da RAM e ser relidos quando necessario, mas desenhos nao salvos nunca sao descartados silenciosamente. Desenho cheio, falta de RAM ou falha ao salvar geram uma mensagem na tela de ferramentas e no serial. Uma falha ao salvar preserva a versao armazenada anteriormente.
+
+O desenho e reprojetado entre os layouts, mantendo os tracos da arte ancorados na arte; as proporcoes do texto e da moldura podem variar um pouco. Expansoes compativeis que apenas acrescentam entradas ao catalogo preservam os desenhos salvos. Prefixos de catalogo alterados ou reordenados nao reutilizam desenhos em outro token. Evite `uploadfs`, que substituiria o sistema de arquivos dos desenhos.
+
+*Desenho e persistencia sao cobertos pelo harness no PC; a sensacao do touch resistivo, as gravacoes na flash e no microSD e a latencia ainda precisam de teste no CYD fisico. Uma caneta deve facilitar os detalhes pequenos.*
+
 ## Contadores
 
 Toque na caixa de texto da carta (no `Custom`, na parte de baixo dela, onde ficam os selos) para abrir a tela de contadores. Cada linha tem **-** e **+**; **<** / **>** trocam de pagina e **BACK** volta para a carta.
@@ -171,11 +210,11 @@ Quantidades, marcadores, modificadores e o token selecionado ficam salvos na fla
 
 ## Configuracoes
 
-A engrenagem (ou o botao **SET** da lista de tokens) abre a tela de configuracoes. Ela tem tres paginas; **<** / **>** trocam de pagina e **BACK** volta.
+A engrenagem (ou o botao **SET** da lista de tokens) abre a tela de configuracoes. Ela tem quatro paginas; **<** / **>** trocam de pagina, **DRAW** abre o modo de desenho do token selecionado e **BACK** volta.
 
-| Layout e brilho | Tom da carta e orientacao | Gama do painel |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/settings.png" alt="Configuracoes pagina 1 com brilho, tempo para apagar a tela e previas dos layouts" width="240"> | <img src="docs/screenshots/settings-tone.png" alt="Configuracoes pagina 2 com tom da carta e orientacao da tela" width="240"> | <img src="docs/screenshots/settings-gamma.png" alt="Configuracoes pagina 3 com perfil de gama e escalas de cinza e RGB" width="240"> |
+| Layout e brilho | Tom da carta e orientacao | Gama do painel | Desenhos |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/settings.png" alt="Configuracoes pagina 1 com brilho, tempo para apagar a tela e previas dos layouts" width="200"> | <img src="docs/screenshots/settings-tone.png" alt="Configuracoes pagina 2 com tom da carta e orientacao da tela" width="200"> | <img src="docs/screenshots/settings-gamma.png" alt="Configuracoes pagina 3 com perfil de gama e escalas de cinza e RGB" width="200"> | <img src="docs/screenshots/settings-doodles.png" alt="Configuracoes pagina 4 com area do desenho, como comecar a desenhar e onde salvar" width="200"> |
 
 ### Pagina 1: brilho, tempo e layout
 
@@ -205,6 +244,14 @@ Para quando todas as cores parecem lavadas ou estouradas, nao so as claras:
   - `ST7789 GAMMA`: as tabelas de gama do ST7789, que alguns paineis clones usam.
 - **TEST RAMPS**: degrades de cinza, vermelho, verde e azul, do preto ao pleno, direto do painel e sem o **CARD TONE**. Num painel bem ajustado cada degrau e diferente do vizinho e os primeiros sao escuros; se os degraus claros se confundem ou os escuros ja saem acinzentados, teste outro perfil. Depois de acertar a gama, ajuste o **CARD TONE** e o **BRIGHTNESS** se ainda for preciso.
 
+### Pagina 4: desenhos
+
+Veja [Modo de desenho](#modo-de-desenho).
+
+- **DOODLE AREA**: `ART ONLY` deixa a tinta so na arte; `WHOLE CARD` (o padrao) libera tambem nome, moldura e texto. O que foi desenhado fora da arte e mantido enquanto `ART ONLY` o esconde.
+- **START DRAWING WITH**: `BUTTON` (o botao **DRAW** da pagina de contadores), `HOLD ART` (segurar a arte por cerca de um segundo) ou `BOTH` (o padrao). Com uma opcao de segurar, tocar na arte vira os tokens quando voce levanta o dedo, e nao quando encosta.
+- **SAVE DOODLES TO**: `RAM` (nada e salvo), `FLASH` (o padrao) ou `SD CARD` (`/doodles` no microSD). A dica embaixo avisa quando nenhum cartao foi encontrado ao ligar.
+
 As configuracoes ficam salvas na flash (NVS), separadas dos tokens, e continuam valendo quando o catalogo muda.
 
 ## Busca
@@ -223,6 +270,10 @@ A lupa ou o botao **FIND** da lista de tokens abre um teclado na tela. Digite e 
 | Gravacao nao consegue abrir a porta | Confira o cabo USB de dados, a porta da placa e a configuracao COM7; feche outros monitores seriais |
 | Token sem ilustracao | Esperado ao baixar o repositorio; gere as artes antes de compilar ou prepare a pasta do microSD |
 | Arte do SD ignorada | Confira FAT32, `/mtgart/catalog.txt`, o indicador nas configuracoes e reinicie depois de inserir o cartao |
+| Desenho desaparece ao reiniciar | So **SAVE** persiste o desenho; **BACK** o mantem apenas na sessao atual. Com **SAVE DOODLES TO** em `RAM` nada e mantido |
+| Toque na arte parece atrasado | Com uma opcao de segurar em **START DRAWING WITH**, o toque conta quando voce levanta o dedo; escolha `BUTTON` para toques instantaneos |
+| Desenhos no microSD nao aparecem | O cartao precisa estar inserido antes de ligar a placa; os desenhos ficam em `/doodles` |
+| Falha ao salvar ou ler um desenho | Leia a mensagem nas ferramentas e no serial; nao inicialize armazenamento existente sem aceitar apagar os desenhos salvos |
 | Cores lavadas | Teste **DISPLAY GAMMA** primeiro, depois **CARD TONE**, brilho e orientacao da tela |
 | Toques fora da posicao | Confira a revisao da placa e a calibracao abaixo |
 
@@ -300,6 +351,8 @@ Resultado da snapshot de 2026-10-24:
 O arquivo gerado inclui um `CATALOG_ID` e os CRCs dos prefixos da lista. Se a expansao mantiver todas as entradas antigas na mesma ordem, quantidades, selecao, contadores, nomes e cartas externas sao preservados. Catalogos incompativeis descartam apenas o estado dos tokens, com aviso no serial; `Custom` e configuracoes continuam preservados.
 
 `partitions.csv` mantem os offsets da aplicacao e da NVS antiga e reserva uma NVS `tokenstore` de 128 KiB para o catalogo ampliado. O firmware migra os saves antigos automaticamente, sem apagar a NVS original. Grave normalmente com PlatformIO para atualizar tambem a tabela de particoes; nao use `erase_flash` para esta atualizacao.
+
+Com **SAVE DOODLES TO** em `FLASH`, os desenhos salvos sao arquivos LittleFS separados na particao `spiffs` ja existente, nao fazem parte da NVS dos tokens. A gravacao normal do firmware preserva essa particao; `uploadfs`, a inicializacao explicita do armazenamento de desenhos ou apagar toda a flash nao preservam. Com `SD CARD`, sao arquivos em `/doodles` no microSD, nomeados pelo ID do prefixo do catalogo e pela posicao (`dXXXXXXXX-NNNN.bin`).
 
 ## Creditos
 

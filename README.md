@@ -11,11 +11,12 @@ An offline Magic: The Gathering token tracker for the **CYD ESP32-2432S028R**. B
 | **455 catalog entries + Custom** | Tokens and emblems covering 198 Commander precon decklists in the 2026-10-24 snapshot |
 | **Three layouts** | Classic controls, full-screen Overlay, or an unobstructed Card only view |
 | **Counters and P/T** | +1/+1, named counters, ability counters, and supported "for each" bonuses |
+| **Doodle on your tokens** | Draw on the artwork or the whole card: eight colors, three brushes, an eraser, Undo, and saves to RAM, flash, or microSD |
 | **Fast lookup** | Search names, types, rules text, colors, and P/T with the on-screen keyboard |
 | **Optional microSD art** | Higher-quality JPEGs, with automatic fallback to embedded artwork |
 | **Persistent state** | Quantities, counters, custom token, and display preferences saved in flash |
 
-[UI tour](#ui-tour) · [Quick start](#quick-start) · [Controls](#controls) · [microSD](#high-quality-artwork-on-microsd) · [Settings](#settings) · [Catalog and development](#token-catalog)
+[UI tour](#ui-tour) · [Quick start](#quick-start) · [Controls](#controls) · [Doodles](#doodle-mode) · [microSD](#high-quality-artwork-on-microsd) · [Settings](#settings) · [Catalog and development](#token-catalog)
 
 ## UI tour
 
@@ -98,6 +99,44 @@ Displayed P/T already includes counters and modifiers. Tokens without P/T (such 
 
 Tokens with variable P/T preserve their printed symbols (`*/*`, `*/1+*`, etc.) instead of displaying them as 0/0. Their modifiers appear beside the symbols; the tracker does not know about zones such as graveyards or players' life totals, so it cannot resolve those abilities by itself. Cragflame is an Equipment: its text appears on the card, but equipping it and applying its bonus to another creature remain manual actions.
 
+## Doodle mode
+
+Moustaches welcome. **Hold the artwork for about a second**, or open **Counters** and tap **DRAW**, to decorate the selected token. **DRAW** in **Settings** always works too. Page 4 of the settings chooses [how drawing starts, where ink goes, and where it is saved](#page-4-doodles).
+
+<img src="docs/screenshots/drawing.png" alt="Drawing mode with a hand-drawn face and moustache on a custom token, plus Back, Pen, Undo, Clear, and Save controls" width="240"> <img src="docs/screenshots/drawing-palette.png" alt="PEN pop-up over the canvas with eight colors, three brush sizes, and the eraser" width="240">
+
+The complete card fits above a separate toolbar, so you can draw without touching game controls. With **DOODLE AREA** set to `WHOLE CARD` (the default) you can draw across the artwork, name, frame, and rules; with `ART ONLY`, ink stays on the artwork and anything already drawn outside it is hidden (not deleted) until you switch back. While drawing, quantity and tap overlays are hidden; game values are not changed. Outside drawing mode, ink remains visible in all three layouts and normal touch actions still work.
+
+| Button | Action |
+| --- | --- |
+| **BACK** | Return to the card, retaining this token's ink for the current session |
+| **PEN** | Open a pop-up over the canvas with eight colors, three brush sizes, and the **ERASE** tool. One tap picks and closes it; tap anywhere else (or **PEN** again) to close without changes. The button reads **ERASE** while the eraser is on |
+| **UNDO** | Remove the most recent complete stroke; a single tap also counts as a stroke |
+| **CLEAR** | Confirm clearing this token's current drawing |
+| **SAVE** | Keep this drawing after a restart, in flash or on the microSD card (see **SAVE DOODLES TO**) |
+
+**Eraser:** with **ERASE** selected, touch any stroke to remove that whole stroke (the topmost one under your finger); drag to erase several. Picking a color or brush returns to the pen.
+
+**Temporary and saved drawings are both supported.** Each token, including `Custom`, has its own drawing. Switching tokens does not discard session ink. Restarting drops unsaved edits and restores the last explicitly saved version, if one exists. Clearing and erasing are also temporary until you press **SAVE**: save an empty drawing to remove its stored version.
+
+Where **SAVE** writes depends on **SAVE DOODLES TO**:
+
+| Option | Where | Notes |
+| --- | --- | --- |
+| `RAM` | Nowhere | Doodles last until the board restarts; **SAVE** only explains this |
+| `FLASH` (default) | 768 KiB `spiffs` partition, LittleFS | No card needed |
+| `SD CARD` | `/doodles` folder on the microSD | The card must be in the slot when the board starts |
+
+Changing this option reads saved drawings from the new place; unsaved session ink stays on screen and can be saved there.
+
+On the first flash save, if drawing storage is not mounted, the firmware asks before initializing it. **INIT formats only the separate 768 KiB drawing partition** (the partition named `spiffs`, used here with LittleFS), never token-save NVS or the microSD. Cancel to keep drawing temporarily. If a previously working filesystem becomes unavailable, initialization will erase drawings in that partition: cancel if you need to recover them. A damaged drawing file is reported rather than silently overwritten; use **CLEAR** to explicitly replace it.
+
+Drawings use compact strokes rather than full-screen bitmaps. Each token is limited to **1,024 sampled points**, with a **32 KiB point-buffer budget** shared by the session; unchanged saved drawings can be unloaded and read back as needed, but unsaved ink is never silently evicted. A full drawing, exhausted RAM, or failed save produces a message in the pen-tools screen and serial log. A failed save retains the previous stored drawing.
+
+Ink is reprojected between layouts, keeping artwork strokes anchored to the artwork; text and frame proportions may differ slightly. Compatible append-only catalog expansions retain saved drawings. Reordered or changed catalog prefixes do not reuse them for another token. Avoid `uploadfs`, which would replace the drawing filesystem.
+
+*Drawing and persistence are covered by the PC harness; resistive-touch feel, flash and microSD writes, and drawing latency still need testing on the physical CYD. A stylus should make small details easier.*
+
 ## Counters
 
 Tap the card's text box (for `Custom`, tap the lower part where the seals appear) to open the counters screen. Each row has **-** and **+**; **<** / **>** change pages, and **BACK** returns to the card.
@@ -171,11 +210,11 @@ Quantities, counters, modifiers, and the selected token are saved in flash (NVS)
 
 ## Settings
 
-The gear (or the **SET** button in the token list) opens settings. There are three pages; **<** / **>** change pages, and **BACK** returns.
+The gear (or the **SET** button in the token list) opens settings. There are four pages; **<** / **>** change pages, **DRAW** opens drawing mode for the selected token, and **BACK** returns.
 
-| Layout and brightness | Card tone and orientation | Panel gamma |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/settings.png" alt="Settings page 1 with brightness, screen timeout, and layout previews" width="240"> | <img src="docs/screenshots/settings-tone.png" alt="Settings page 2 with card tone and screen orientation controls" width="240"> | <img src="docs/screenshots/settings-gamma.png" alt="Settings page 3 with gamma profile and grayscale and RGB test ramps" width="240"> |
+| Layout and brightness | Card tone and orientation | Panel gamma | Doodles |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/settings.png" alt="Settings page 1 with brightness, screen timeout, and layout previews" width="200"> | <img src="docs/screenshots/settings-tone.png" alt="Settings page 2 with card tone and screen orientation controls" width="200"> | <img src="docs/screenshots/settings-gamma.png" alt="Settings page 3 with gamma profile and grayscale and RGB test ramps" width="200"> | <img src="docs/screenshots/settings-doodles.png" alt="Settings page 4 with doodle area, how drawing starts, and where doodles are saved" width="200"> |
 
 ### Page 1: brightness, timeout, and layout
 
@@ -205,6 +244,14 @@ For when all colors look washed out or overexposed, not only light colors:
   - `ST7789 GAMMA`: ST7789 gamma tables, used by some clone panels.
 - **TEST RAMPS**: grayscale, red, green, and blue gradients from black to full intensity, rendered directly by the panel without **CARD TONE**. On a well-adjusted panel each step differs from its neighbor and the first steps are dark; if bright steps blend together or dark steps already look gray, try another profile. After setting gamma, adjust **CARD TONE** and **BRIGHTNESS** if needed.
 
+### Page 4: doodles
+
+See [Doodle mode](#doodle-mode).
+
+- **DOODLE AREA**: `ART ONLY` keeps ink on the artwork; `WHOLE CARD` (default) also allows the name, frame, and rules. Ink drawn outside the artwork is kept while `ART ONLY` hides it.
+- **START DRAWING WITH**: `BUTTON` (the **DRAW** button on the counters page), `HOLD ART` (hold the artwork for about a second), or `BOTH` (default). With a hold option, tapping the artwork taps the tokens when you lift your finger instead of when you touch it.
+- **SAVE DOODLES TO**: `RAM` (nothing is saved), `FLASH` (default), or `SD CARD` (`/doodles` on the microSD). The hint below says when no card was found at startup.
+
 Settings are saved in flash (NVS), separately from tokens, and remain in effect when the catalog changes.
 
 ## Search
@@ -223,6 +270,10 @@ The magnifying glass or **FIND** button in the token list opens an on-screen key
 | Upload cannot open the port | Check the USB data cable, board port, and COM7 settings; close any other serial monitor |
 | No token illustration | Expected on a fresh checkout; generate artwork before building, or prepare the microSD folder |
 | SD art is ignored | Check FAT32, `/mtgart/catalog.txt`, the settings label, and restart after inserting the card |
+| A doodle disappears after restarting | Only **SAVE** persists ink; **BACK** keeps it for the current session. With **SAVE DOODLES TO** set to `RAM` nothing is kept |
+| Tapping the artwork feels delayed | With a hold option in **START DRAWING WITH**, the tap counts when you lift your finger; choose `BUTTON` for instant taps |
+| Doodles on the SD card are not found | The card must be inserted before the board starts; the drawings are in `/doodles` |
+| Drawing save or load fails | Read the pen-tools message and serial log; do not initialize existing storage unless you accept erasing saved drawings |
 | Colors look washed out | Try **DISPLAY GAMMA** first, then **CARD TONE**, brightness, and screen orientation |
 | Buttons respond at the wrong positions | Check board revision and touch calibration below |
 
@@ -300,6 +351,8 @@ Results for the 2026-10-24 snapshot:
 The generated file includes a `CATALOG_ID` and CRCs for list prefixes. If an expansion preserves all existing entries in the same order, quantities, selection, counters, names, and custom cards are preserved. Incompatible catalogs discard only token state, with a serial warning; `Custom` and settings remain preserved.
 
 `partitions.csv` keeps the offsets of the application and original NVS and reserves a 128 KiB `tokenstore` NVS for the expanded catalog. Firmware automatically migrates old saves without erasing the original NVS. Flash normally with PlatformIO to update the partition table as well; do not use `erase_flash` for this update.
+
+With **SAVE DOODLES TO** set to `FLASH`, saved doodles are separate LittleFS files in the existing `spiffs` partition, not part of token NVS. Normal firmware upload preserves that partition; `uploadfs`, explicit drawing-storage initialization, or a full flash erase does not. With `SD CARD`, they are files in `/doodles` on the microSD, named by catalog prefix ID and position (`dXXXXXXXX-NNNN.bin`).
 
 ## Credits
 

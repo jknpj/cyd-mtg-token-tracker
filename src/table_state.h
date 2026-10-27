@@ -13,6 +13,11 @@ constexpr uint8_t MAX_PLAYERS = 8;
 constexpr int LIFE_LIMIT = 9999;
 constexpr uint16_t DAMAGE_LIMIT = 999;
 constexpr uint8_t MAX_DICE = 20;
+// Counters a player (not a permanent) can have, plus emblems they own.
+enum PlayerCounter : uint8_t { Poison, Rad, Energy, Experience, Emblems };
+constexpr uint8_t PLAYER_COUNTER_KINDS = 5;
+constexpr uint16_t PLAYER_COUNTER_LIMIT = 999;
+constexpr uint16_t POISON_LETHAL = 10;
 constexpr uint8_t DIE_SIDES[] = {2, 4, 6, 8, 10, 12, 20};
 
 struct Deck {
@@ -58,30 +63,61 @@ struct DeckBook {
 };
 
 struct Match {
-  uint32_t version = 1;
+  static constexpr uint32_t VERSION = 2;
+  uint32_t version = VERSION;
   uint8_t players = 4;
   uint8_t reserved = 0;
   int16_t initialLife = 40;
   int16_t life[MAX_PLAYERS] = {};
   uint16_t damage[MAX_PLAYERS][MAX_PLAYERS][2] = {};  // Recipient, source player, commander.
+  // Version 2 appended the fields below; a version 1 save is the part before them.
+  uint16_t counters[MAX_PLAYERS][PLAYER_COUNTER_KINDS] = {};
+  int8_t monarch = -1;     // The player who is the monarch, or -1.
+  int8_t initiative = -1;  // The player who has the initiative, or -1.
+  uint8_t reserved2[2] = {};
 
   void reset(uint8_t count, int16_t initial) {
     players = count;
     initialLife = initial;
     for (auto &value : life) value = initial;
     memset(damage, 0, sizeof(damage));
+    memset(counters, 0, sizeof(counters));
+    monarch = initiative = -1;
   }
 
   bool valid() const {
-    if (version != 1 || players < 1 || players > MAX_PLAYERS || initialLife < 1 || initialLife > LIFE_LIMIT)
+    if (version != VERSION || players < 1 || players > MAX_PLAYERS || initialLife < 1 || initialLife > LIFE_LIMIT)
       return false;
+    if (monarch < -1 || monarch >= players || initiative < -1 || initiative >= players) return false;
     for (size_t recipient = 0; recipient < MAX_PLAYERS; ++recipient) {
       if (life[recipient] < -LIFE_LIMIT || life[recipient] > LIFE_LIMIT) return false;
       for (size_t source = 0; source < MAX_PLAYERS; ++source)
         for (size_t commander = 0; commander < 2; ++commander)
           if (damage[recipient][source][commander] > DAMAGE_LIMIT) return false;
+      for (uint16_t value : counters[recipient])
+        if (value > PLAYER_COUNTER_LIMIT) return false;
     }
     return true;
+  }
+
+  bool adjustCounter(uint8_t player, uint8_t kind, int delta) {
+    if (player >= players || kind >= PLAYER_COUNTER_KINDS) return false;
+    uint16_t &value = counters[player][kind];
+    int next = value + delta;
+    if (next < 0) next = 0;
+    if (next > PLAYER_COUNTER_LIMIT) next = PLAYER_COUNTER_LIMIT;
+    if (next == value) return false;
+    value = next;
+    return true;
+  }
+
+  // The monarch and the initiative belong to one player at a time; giving one moves it.
+  void toggleHolder(int8_t &holder, uint8_t player) {
+    if (player < players) holder = holder == player ? -1 : player;
+  }
+
+  bool poisoned(uint8_t player) const {
+    return player < players && counters[player][Poison] >= POISON_LETHAL;
   }
 
   bool adjustLife(uint8_t player, int delta) {
@@ -111,6 +147,22 @@ struct Match {
     return false;
   }
 };
+
+constexpr size_t MATCH_V1_SIZE = offsetof(Match, counters);
+
+// Restores a saved match of either layout; a version 1 save starts with no player counters.
+inline bool loadMatch(Match &match, const void *data, size_t length) {
+  Match loaded;
+  if (length != sizeof(Match) && length != MATCH_V1_SIZE) return false;
+  memcpy(&loaded, data, length);
+  if (length == MATCH_V1_SIZE) {
+    if (loaded.version != 1) return false;
+    loaded.version = Match::VERSION;
+  }
+  if (!loaded.valid()) return false;
+  match = loaded;
+  return true;
+}
 
 // A player's panel on the life screen. The board lies in the middle of the table, so each panel is
 // turned toward the edge its player sits at.

@@ -519,7 +519,7 @@ uint32_t countShownAt = 0;
 
 enum class Screen : uint8_t {
   Card, Picker, Editor, Keyboard, Settings, Counters, Drawing, DrawingTools,
-  Home, TokenMenu, Decks, Match, MatchSetup, Dice, Confirm, Precons
+  Home, TokenMenu, Decks, Match, MatchSetup, Dice, Confirm, Precons, PlayerCounters
 };
 Screen screen = Screen::Home;
 size_t pickerPage = 0;
@@ -567,6 +567,7 @@ int8_t damageTarget = -1;  // While >= 0, the other panels show the commander da
 uint8_t damageSlot[tabletop::MAX_PLAYERS] = {};  // Which of each source's two commanders is shown.
 int8_t startingSeat = -1;
 bool lifeMenu = false;
+uint8_t counterPlayer = 0;  // Whose poison, energy and emblems the player counters page shows.
 uint32_t touchReleases = 0;  // Counts lifted fingers, to tell a held press from repeated taps.
 bool fingerDown = false;
 uint32_t holdRelease = UINT32_MAX;
@@ -1018,8 +1019,10 @@ void loadTableState() {
   else
     tableError("Invalid match defaults");
   if (resumeMatch && tablePrefs.isKey("match")) {
-    if (tablePrefs.getBytesLength("match") != sizeof(match) ||
-        tablePrefs.getBytes("match", &match, sizeof(match)) != sizeof(match) || !match.valid()) {
+    static uint8_t saved[sizeof(tabletop::Match)];
+    const size_t length = tablePrefs.getBytesLength("match");
+    if (length > sizeof(saved) || tablePrefs.getBytes("match", saved, length) != length ||
+        !tabletop::loadMatch(match, saved, length)) {
       match = tabletop::Match{};
       match.reset(4, 40);
       tableError("Invalid match save");
@@ -3095,8 +3098,8 @@ constexpr int LIFE_HOLD_FAST = 4;  // Repeats of a held press before it steps by
 constexpr int MENU_X = 40, MENU_W = 160, MENU_Y = 62, MENU_STEP = 34;
 constexpr int LIFE_MENU_ROWS = 6, TOKEN_MENU_ROWS = 5;
 // The empty row is the SAVE MATCH switch, whose label shows its state.
-const char *const LIFE_MENU[LIFE_MENU_ROWS] = {"DICE / COIN", "WHO STARTS?", "NEW GAME", nullptr, "MAIN MENU",
-                                               "CLOSE"};
+const char *const LIFE_MENU[LIFE_MENU_ROWS] = {"DICE / COIN", "WHO STARTS?", "PLAYERS / NEW GAME", nullptr,
+                                               "MAIN MENU", "CLOSE"};
 const char *const TOKEN_MENU[TOKEN_MENU_ROWS] = {"CHOOSE TOKEN", "DECKS / PRECONS", "CARD OPTIONS", "MAIN MENU",
                                                  "CLOSE"};
 // Palette entries of a life panel sprite.
@@ -3162,11 +3165,43 @@ void pushSeat(TFT_eSprite &panel, const tabletop::Seat &seat, const uint16_t *pa
   display.endWrite();
 }
 
+const char *const PLAYER_COUNTER_NAMES[tabletop::PLAYER_COUNTER_KINDS] = {"POISON", "RAD", "ENERGY", "EXPERIENCE",
+                                                                         "EMBLEMS"};
+const char *const PLAYER_COUNTER_SHORT[tabletop::PLAYER_COUNTER_KINDS] = {"PSN", "RAD", "EN", "XP", "EMB"};
+
+// The player's monarch, initiative and counters in one line. Short names and separators are used when the
+// long ones do not fit; whatever still does not fit is left out and a "+" says so.
+String playerSummary(TFT_eSprite &panel, uint8_t player, int maxW) {
+  String text;
+  for (int compact = 0; compact < 2; ++compact) {
+    String parts[tabletop::PLAYER_COUNTER_KINDS + 2];
+    uint8_t count = 0;
+    if (match.monarch == player) parts[count++] = compact ? "MON" : "MONARCH";
+    if (match.initiative == player) parts[count++] = compact ? "INIT" : "INITIATIVE";
+    for (uint8_t kind = 0; kind < tabletop::PLAYER_COUNTER_KINDS; ++kind)
+      if (match.counters[player][kind])
+        parts[count++] = String(PLAYER_COUNTER_SHORT[kind]) + " " + String(match.counters[player][kind]);
+    const char *gap = compact ? " " : "  ";
+    text = "";
+    uint8_t shown = 0;
+    // The pill's ends take 12 pixels.
+    for (; shown < count; ++shown) {
+      const String next = shown ? text + gap + parts[shown] : parts[shown];
+      const int reserve = shown + 1 < count ? panel.textWidth(" +", 1) : 0;
+      if (shown && panel.textWidth(next, 1) + 12 + reserve > maxW) break;
+      text = next;
+    }
+    if (shown == count) return text;
+    if (compact) return text + " +";
+  }
+  return text;
+}
+
 void drawSeat(uint8_t player) {
   const tabletop::Seat seat = lifeSeat(player);
   const int w = seat.readerW(), h = seat.readerH();
   const bool damageView = damageTarget >= 0 && player != damageTarget;
-  const bool lethal = match.life[player] <= 0 || match.commanderLethal(player);
+  const bool lethal = match.life[player] <= 0 || match.commanderLethal(player) || match.poisoned(player);
   const int value = damageView ? match.damage[damageTarget][player][damageSlot[player]] : match.life[player];
   uint16_t base = PLAYER_COLORS[player];
   if (damageView || lethal) base = display.alphaBlend(110, base, TFT_BLACK);
@@ -3204,8 +3239,11 @@ void drawSeat(uint8_t player) {
   }
 
   // The biggest number that fits, leaving room for the - and + hints when possible.
+  const bool narrow = w < 120;
+  const String summary = damageTarget < 0 ? playerSummary(panel, player, w - 12) : String();
   const String text(value);
-  const int areaH = stripTop - 2;
+  const int areaTop = summary.length() ? 20 : 1;
+  const int areaH = stripTop - 1 - areaTop;
   const bool hints = !(damageTarget >= 0 && !damageView);
   struct Size { uint8_t font, scale; };
   static const Size SIZES[] = {{7, 2}, {7, 1}, {4, 2}, {4, 1}, {2, 1}};
@@ -3223,7 +3261,7 @@ void drawSeat(uint8_t player) {
       }
     }
   }
-  const int centerY = 1 + areaH / 2;
+  const int centerY = areaTop + areaH / 2;
   panel.setTextDatum(MC_DATUM);
   panel.setTextSize(chosen.scale);
   const bool red = damageView ? value >= 21 : lethal;
@@ -3237,12 +3275,17 @@ void drawSeat(uint8_t player) {
   }
 
   // Bottom strip: seat, recent change and commander damage.
-  const bool narrow = w < 120;
   const int smallFont = narrow ? 1 : 2;
   const int stripY = stripTop + LIFE_STRIP_H / 2;
+  const String seatName = "P" + String(player + 1);
   panel.setTextDatum(ML_DATUM);
   panel.setTextColor(InkSoft);
-  panel.drawString("P" + String(player + 1), 7, stripY, smallFont);
+  panel.drawString(seatName, 7, stripY, smallFont);
+  if (damageTarget < 0) {
+    // Outlined like a button: it opens the player's counters.
+    const int nameH = panel.fontHeight(smallFont) + 4;
+    panel.drawRoundRect(3, stripY - nameH / 2, panel.textWidth(seatName, smallFont) + 8, nameH, nameH / 2, InkSoft);
+  }
   if (damageTarget >= 0 && !damageView) {
     panelPill(panel, "DONE", w / 2, stripY, smallFont, InkGold, InkBlack, MC_DATUM);
   } else if (damageView) {
@@ -3251,8 +3294,10 @@ void drawSeat(uint8_t player) {
     panel.drawString(narrow ? String("DMG") : "TO P" + String(damageTarget + 1), w / 2, stripY, 1);
     panelPill(panel, "C" + String(damageSlot[player] + 1), w - 6, stripY, smallFont, InkGold, InkBlack, MR_DATUM);
   } else {
-    // Narrow panels have no room in the strip, so the bubble floats above the number.
+    // Narrow panels have no room in the strip, so the bubble floats above the number, over the summary.
     const int bubbleY = narrow ? 11 : stripY;
+    if (summary.length() && !(narrow && (lifeDelta[player] || (starting && !choosingStart))))
+      panelPill(panel, summary, w / 2, 11, 1, InkStrip, InkText, MC_DATUM);
     if (lifeDelta[player]) {
       const String delta = (lifeDelta[player] > 0 ? "+" : "") + String(lifeDelta[player]);
       panelPill(panel, delta, w / 2, bubbleY, smallFont, InkGold, InkBlack, MC_DATUM);
@@ -3338,6 +3383,131 @@ void lifeChanged(uint8_t player, int before) {
   lifeDeltaAt[player] = millis();
 }
 
+// The player counters page fills the screen, turned toward the player who opened it.
+constexpr int SHEET_HEADER_H = 34, SHEET_FOOTER_H = 44, SHEET_BUTTON_W = 40;
+constexpr int SHEET_ROWS = tabletop::PLAYER_COUNTER_KINDS + 1;  // The last row holds monarch and initiative.
+
+tabletop::Seat counterSheet() {
+  return {0, 0, int16_t(SCREEN_W), int16_t(SCREEN_H), lifeSeat(counterPlayer).facing};
+}
+
+int sheetRowH(int h) {
+  return (h - SHEET_HEADER_H - SHEET_FOOTER_H) / SHEET_ROWS;
+}
+
+// Left edges of a counter row's - and + buttons.
+void sheetButtons(int w, int &minusX, int &plusX) {
+  plusX = w - 8 - SHEET_BUTTON_W;
+  minusX = plusX - 56 - SHEET_BUTTON_W;
+}
+
+void drawPlayerCounters() {
+  const tabletop::Seat sheet = counterSheet();
+  const int w = sheet.readerW(), h = sheet.readerH();
+  enum : uint8_t { Back, Header, Tile, TileOn, Text, Dim, Gold, Lethal, White };
+  uint16_t palette[16] = {};
+  palette[Back] = BACKGROUND;
+  palette[Header] = PLAYER_COLORS[counterPlayer];
+  palette[Tile] = PANEL;
+  palette[TileOn] = PANEL_SELECTED;
+  palette[Text] = INK;
+  palette[Dim] = HINT;
+  palette[Gold] = HIGHLIGHT;
+  palette[Lethal] = LETHAL_INK;
+  palette[White] = TFT_WHITE;
+  TFT_eSprite page(&display);
+  page.setColorDepth(4);
+  if (!page.createSprite(w, h)) {
+    openLife();
+    tableError("Not enough memory for counters");
+    drawTablePage();
+    return;
+  }
+  page.createPalette(palette, 16);
+  page.fillSprite(Back);
+
+  page.fillRoundRect(4, 3, w - 8, SHEET_HEADER_H - 6, 6, Header);
+  page.setTextColor(White);
+  page.setTextDatum(ML_DATUM);
+  page.drawString("P" + String(counterPlayer + 1) + " COUNTERS", 12, SHEET_HEADER_H / 2, 2);
+  page.setTextDatum(MR_DATUM);
+  page.drawString("LIFE " + String(match.life[counterPlayer]), w - 12, SHEET_HEADER_H / 2, 2);
+
+  const int rowH = sheetRowH(h);
+  const int bigFont = rowH >= 34 ? 4 : 2;
+  int minusX, plusX;
+  sheetButtons(w, minusX, plusX);
+  for (uint8_t kind = 0; kind < tabletop::PLAYER_COUNTER_KINDS; ++kind) {
+    const int top = SHEET_HEADER_H + kind * rowH, mid = top + rowH / 2;
+    const uint16_t value = match.counters[counterPlayer][kind];
+    page.fillRoundRect(4, top + 2, w - 8, rowH - 4, 4, Tile);
+    page.setTextDatum(ML_DATUM);
+    page.setTextColor(value ? Text : Dim);
+    page.drawString(PLAYER_COUNTER_NAMES[kind], 12, mid, 2);
+    page.setTextDatum(MC_DATUM);
+    for (int x : {minusX, plusX}) {
+      page.fillRoundRect(x, top + 5, SHEET_BUTTON_W, rowH - 10, 4, TileOn);
+      page.setTextColor(Text);
+      page.drawString(x == minusX ? "-" : "+", x + SHEET_BUTTON_W / 2, mid, bigFont);
+    }
+    const bool lethal = kind == tabletop::Poison && match.poisoned(counterPlayer);
+    page.setTextColor(lethal ? Lethal : value ? Gold : Dim);
+    page.drawString(String(value), (minusX + SHEET_BUTTON_W + plusX) / 2, mid, bigFont);
+  }
+
+  const int top = SHEET_HEADER_H + tabletop::PLAYER_COUNTER_KINDS * rowH;
+  const bool held[2] = {match.monarch == counterPlayer, match.initiative == counterPlayer};
+  static const char *const HOLDERS[2] = {"MONARCH", "INITIATIVE"};
+  for (int i = 0; i < 2; ++i) {
+    const int x = i ? w / 2 + 2 : 4;
+    page.fillRoundRect(x, top + 2, w / 2 - 6, rowH - 4, 4, held[i] ? TileOn : Tile);
+    page.setTextColor(held[i] ? Gold : Text);
+    page.drawString(HOLDERS[i], x + (w / 2 - 6) / 2, top + rowH / 2, 2);
+  }
+
+  const int footerY = h - SHEET_FOOTER_H;
+  page.fillRoundRect(w / 2 - 60, footerY + 4, 120, SHEET_FOOTER_H - 8, 6, TileOn);
+  page.setTextColor(Gold);
+  page.drawString("DONE", w / 2, footerY + SHEET_FOOTER_H / 2, 2);
+  pushSeat(page, sheet, palette);
+  page.deleteSprite();
+}
+
+void openPlayerCounters(uint8_t player) {
+  counterPlayer = player;
+  lifeMenu = false;
+  navigate(Screen::PlayerCounters);
+  drawTablePage();
+}
+
+void handlePlayerCountersTouch(int x, int y) {
+  const tabletop::Seat sheet = counterSheet();
+  int u = 0, v = 0;
+  if (!sheet.toReader(x, y, u, v)) return;
+  const int w = sheet.readerW(), h = sheet.readerH();
+  if (v >= h - SHEET_FOOTER_H) {
+    openLife();
+    return;
+  }
+  if (v < SHEET_HEADER_H) return;
+  const int row = (v - SHEET_HEADER_H) / sheetRowH(h);
+  if (row < tabletop::PLAYER_COUNTER_KINDS) {
+    int minusX, plusX;
+    sheetButtons(w, minusX, plusX);
+    // Generous targets: the left half of the gap counts as -, everything right of it as +.
+    const int split = (minusX + SHEET_BUTTON_W + plusX) / 2;
+    if (u < minusX - 8) return;
+    if (!match.adjustCounter(counterPlayer, row, u < split ? -1 : 1)) return;
+    awaitRelease = false;  // Holding a button keeps counting.
+  } else if (row == tabletop::PLAYER_COUNTER_KINDS) {
+    match.toggleHolder(u < w / 2 ? match.monarch : match.initiative, counterPlayer);
+  } else {
+    return;
+  }
+  if (resumeMatch) scheduleTableSave();
+  drawPlayerCounters();
+}
+
 void handleLifeTouch(int x, int y, bool redrawAll) {
   if (lifeMenu) {
     lifeMenu = false;
@@ -3405,7 +3575,12 @@ void handleLifeTouch(int x, int y, bool redrawAll) {
       return;
     }
   } else if (inStrip) {
-    if (match.players < 2) return;
+    // The left half of the strip, around the player's name, opens their counters; the right half
+    // (the CMD pill) shows the commander damage they took.
+    if (match.players < 2 || u < seat.readerW() / 2) {
+      openPlayerCounters(player);
+      return;
+    }
     damageTarget = player;
     drawTablePage();
     return;
@@ -3882,6 +4057,8 @@ void drawTablePage() {
   if (screen == Screen::Match) {
     // The panels cover the screen; clearing it first would only make it flicker.
     drawLifeScreen();
+  } else if (screen == Screen::PlayerCounters) {
+    drawPlayerCounters();
   } else {
     display.fillScreen(BACKGROUND);
   }
@@ -3963,7 +4140,7 @@ void drawTablePage() {
       static const int16_t PRESETS[4] = {20, 25, 30, 40};
       tableTile(2 + i * 60, 188, 56, 36, String(PRESETS[i]), setupLife == PRESETS[i]);
     }
-    tableLabel("START resets life and commander damage.", 120, 250, 1, HINT);
+    tableLabel("START resets life, damage, counters.", 120, 250, 1, HINT);
     drawButton(0, "BACK", INK);
     drawButton(4, "START", HIGHLIGHT);
   } else if (screen == Screen::Dice) {
@@ -3981,7 +4158,7 @@ void drawTablePage() {
   } else if (screen == Screen::Confirm) {
     const bool deleting = tablePrompt == TablePrompt::DeleteDeck;
     tableLabel(deleting ? "DELETE DECK?" : "START NEW MATCH?", 120, 60);
-    tableLabel(deleting ? "Only this deck's token filter is removed." : "Life and commander damage will reset.",
+    tableLabel(deleting ? "Only this deck's token filter is removed." : "Life, damage and counters will reset.",
                120, 116, 1);
     tableLabel("Token counts/counters stay unchanged.", 120, 140, 1, HINT);
     drawButton(0, "CANCEL", INK);
@@ -4108,6 +4285,8 @@ void handleTableTouch(int x, int y) {
     }
   } else if (screen == Screen::Match) {
     handleLifeTouch(x, y, hadMessage);
+  } else if (screen == Screen::PlayerCounters) {
+    handlePlayerCountersTouch(x, y);
   } else if (screen == Screen::MatchSetup) {
     if (y >= BAR_Y - 4) {
       if (button == 0) openLife();

@@ -15,7 +15,7 @@ Um companheiro de mesa offline de Magic: The Gathering para a placa barata **CYD
 
 - **Painel de tokens**: 455 tokens de todos os precons de Commander, mais o seu token personalizado. Acompanhe quantos estao em jogo, quantos estao virados, marcadores e poder/resistencia.
 - **Decks e precons**: importe os tokens de qualquer um dos **198 precons de Commander** com um toque, ou monte ate oito decks seus.
-- **Contador de vida**: paineis grandes e coloridos para **1 a 8 jogadores**, cada um virado para o seu lugar, com dano de comandante (parceiros inclusos) e sorteio de "quem comeca?".
+- **Contador de vida**: paineis grandes e coloridos para **1 a 8 jogadores**, cada um virado para o seu lugar, com dano de comandante (parceiros inclusos), veneno, rad, energia, experiencia, emblemas, monarca e iniciativa, e sorteio de "quem comeca?".
 - **Dados e moedas em 3D**: d4 a d20 e moedas, ate 20 por vez, com um lancamento 3D girando.
 - **Desenhos**: desenhe bigodes (ou o que quiser) nos seus tokens.
 - **Tudo fica salvo** entre as sessoes: tokens, marcadores, decks, configuracoes e, se quiser, a partida em andamento.
@@ -47,15 +47,15 @@ Um companheiro de mesa offline de Magic: The Gathering para a placa barata **CYD
 
 **Vida, dados e moedas**
 
-| Contador de vida | Dano de comandante | Menu da vida |
+| Contador de vida | Marcadores do jogador | Dano de comandante |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/life-counter.png" alt="Quatro jogadores no meio da partida, com o jogador 2 marcado FIRST" width="200"> | <img src="docs/screenshots/commander-damage.png" alt="Registrando dano de comandante no jogador 3: o jogador 1 causou 7" width="200"> | <img src="docs/screenshots/life-menu.png" alt="Menu da vida: Dice / Coin, Who starts?, New game, Save match, Main menu, Close" width="200"> |
-| Metade esquerda -1, direita +1 | Dano de cada comandante | Quem comeca, nova partida e mais |
+| <img src="docs/screenshots/life-counter.png" alt="Quatro jogadores no meio da partida; o jogador 1 e o monarca, com 3 de veneno, 2 de energia e 1 emblema" width="200"> | <img src="docs/screenshots/player-counters.png" alt="Marcadores do jogador 1: veneno 3, energia 3, emblemas 1, monarca ativo" width="200"> | <img src="docs/screenshots/commander-damage.png" alt="Registrando dano de comandante no jogador 3: o jogador 1 causou 7" width="200"> |
+| Metade esquerda -1, direita +1 | Veneno, energia, emblemas, monarca... | Dano de cada comandante |
 
-| Dados | Moedas |
-| :---: | :---: |
-| <img src="docs/screenshots/dice.png" alt="Tres d20 rolados somando 13" width="200"> | <img src="docs/screenshots/coins.png" alt="Tres moedas: uma cara dourada e duas coroas prateadas" width="200"> |
-| d4 a d20, ate 20 de uma vez | Caras e coroas contadas para voce |
+| Menu da vida | Nova partida | Dados | Moedas |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/life-menu.png" alt="Menu da vida: Dice / Coin, Who starts?, Players / New game, Save match, Main menu, Close" width="170"> | <img src="docs/screenshots/match-setup.png" alt="Nova partida: 4 jogadores, vida inicial 40, com atalhos 20/25/30/40" width="170"> | <img src="docs/screenshots/dice.png" alt="Tres d20 rolados somando 13" width="170"> | <img src="docs/screenshots/coins.png" alt="Tres moedas: uma cara dourada e duas coroas prateadas" width="170"> |
+| Quem comeca, jogadores e mais | 1 a 8 jogadores, qualquer vida inicial | d4 a d20, ate 20 de uma vez | Caras e coroas contadas para voce |
 
 **Visual e configuracoes**
 
@@ -113,8 +113,8 @@ A placa comeca no **MAIN MENU**. Escolha um modo; voce pode trocar a qualquer mo
 
 1. Toque em **LIFE COUNTER**. Coloque todos em volta da placa: cada painel fica virado para o seu jogador.
 2. Toque na **metade esquerda** de um painel para **-1** e na **metade direita** para **+1**; segure para ir mais rapido.
-3. Toque na **faixa com o nome** de um jogador para registrar dano de comandante causado a ele.
-4. O botao redondo no meio abre **WHO STARTS?**, **NEW GAME** (jogadores e vida inicial), dados e mais.
+3. Toque no **nome** do jogador (`P1`) na faixa para veneno, rad, energia, experiencia, emblemas, monarca e iniciativa; toque em **CMD** para registrar dano de comandante causado a ele.
+4. O botao redondo no meio abre **WHO STARTS?**, **PLAYERS / NEW GAME** (1 a 8 jogadores e vida inicial), dados e mais.
 
 **Dados e moedas**
 
@@ -287,14 +287,18 @@ Decks e precons fazem parte do modo de tokens: abra pelo menu de tokens (**DECKS
 Abra **LIFE COUNTER** no menu principal. Cada um dos **1 a 8 jogadores** ganha um painel colorido virado para o seu lugar em volta do aparelho: o primeiro embaixo (ou embaixo a esquerda) e os demais em sentido horario, subindo pela esquerda e descendo pela direita; com dois jogadores, o segundo painel fica virado para cima.
 
 - Toque na **metade esquerda** de um painel para **-1** e na **metade direita** para **+1**. Segure para repetir; depois de algumas repeticoes o passo vira **10**. Uma bolha amarela mostra a variacao acumulada (`+3`, `-7`) e some cerca de 2,5 segundos apos o ultimo toque.
-- O painel escurece e o numero fica vermelho claro quando o jogador esta com **0 ou menos** ou levou **21** de um mesmo comandante.
-- O **botao redondo** no meio abre **DICE / COIN**, **WHO STARTS?** (um destaque gira pela mesa, desacelera e para num jogador aleatorio, marcado com `FIRST`; o proximo toque limpa), **NEW GAME**, **SAVE MATCH: ON / OFF**, **MAIN MENU** e **CLOSE**. Toque fora do menu para fecha-lo.
+- O painel escurece e o numero fica vermelho claro quando o jogador esta com **0 ou menos**, tem **10 de veneno** ou levou **21** de um mesmo comandante.
+- O **botao redondo** no meio abre **DICE / COIN**, **WHO STARTS?** (um destaque gira pela mesa, desacelera e para num jogador aleatorio, marcado com `FIRST`; o proximo toque limpa), **PLAYERS / NEW GAME**, **SAVE MATCH: ON / OFF**, **MAIN MENU** e **CLOSE**. Toque fora do menu para fecha-lo.
 
-**NEW GAME** escolhe o numero de jogadores e a vida inicial, com atalhos **20 / 25 / 30 / 40** e ajuste fino de **1 a 9999**. **START** pede confirmacao antes de restaurar a vida inicial e zerar o dano de comandante; nao altera os tokens. O numero de jogadores e a vida inicial escolhidos ficam salvos mesmo com a restauracao da partida desligada.
+**PLAYERS / NEW GAME** escolhe o numero de jogadores (**1 a 8**; da para baixar para tres quando alguem sai) e a vida inicial, com atalhos **20 / 25 / 30 / 40** e ajuste fino de **1 a 9999**. **START** pede confirmacao antes de restaurar a vida inicial e zerar o dano de comandante e os marcadores; nao altera os tokens. O numero de jogadores e a vida inicial escolhidos ficam salvos mesmo com a restauracao da partida desligada.
 
-A faixa na base de cada painel mostra `P1` a `P8` e uma pilula **CMD** com o maior dano que esse jogador levou de um unico comandante. **Toque na faixa** para registrar dano de comandante **recebido** por esse jogador: os outros paineis escurecem e mostram quanto cada um causou (`TO P2`); as metades **+ / -** deles somam ou tiram esse dano, o que tambem ajusta a vida de quem recebe. Toque na faixa de uma origem para alternar entre **C1** e **C2** (parceiros); os danos dos parceiros nunca sao somados para o limite de 21. Toque no painel de quem recebe (`DONE`) ou no botao de confirmacao no meio para voltar. A vida aceita **-9999 a 9999**, e cada registro de dano de comandante aceita **0 a 999**. E um controle manual, nao um motor de regras nem uma eliminacao automatica.
+A faixa na base de cada painel mostra o nome do jogador (`P1` a `P8`, contornado como um botao) e uma pilula **CMD** com o maior dano que esse jogador levou de um unico comandante.
 
-**SAVE MATCH: OFF / ON**, no menu da vida, decide se vida e dano de comandante voltam depois de reiniciar; o menu continua aberto para mostrar o novo estado. O padrao e **OFF**. Ativar **ON** salva a partida atual imediatamente; as proximas alteracoes sao salvas apos 1,5 segundo sem edicoes. Voltar para **OFF** remove a partida salva imediatamente, mas mantem a partida atual na RAM; ao reiniciar, comeca uma partida nova usando os padroes salvos de jogadores e vida inicial. Os decks e os saves existentes dos tokens independem dessa opcao. Aguarde pelo menos 1,5 segundo apos editar antes de desligar; erros de armazenamento aparecem no cabecalho das telas de mesa e no serial.
+**Marcadores do jogador.** Toque no **nome** (`P1`) para abrir a pagina de marcadores desse jogador, virada para ele: **POISON** (veneno), **RAD**, **ENERGY** (energia), **EXPERIENCE** (experiencia) e **EMBLEMS** (emblemas) com **-** / **+** (segure para repetir, **0 a 999**), alem de **MONARCH** (monarca) e **INITIATIVE** (iniciativa). So um jogador tem cada designacao: dar para alguem tira de quem tinha, e tocar de novo limpa. **DONE** volta para a mesa. No painel, uma pilula acima da vida resume tudo (`MONARCH  PSN 3  EN 3  EMB 1`); um `+` indica que ha mais marcadores do que cabem.
+
+**Dano de comandante.** Toque em **CMD** (com um jogador so, a faixa inteira abre os marcadores) para registrar dano de comandante **recebido** por esse jogador: os outros paineis escurecem e mostram quanto cada um causou (`TO P2`); as metades **+ / -** deles somam ou tiram esse dano, o que tambem ajusta a vida de quem recebe. Toque na faixa de uma origem para alternar entre **C1** e **C2** (parceiros); os danos dos parceiros nunca sao somados para o limite de 21. Toque no painel de quem recebe (`DONE`) ou no botao de confirmacao no meio para voltar. A vida aceita **-9999 a 9999**, e cada registro de dano de comandante aceita **0 a 999**. E um controle manual, nao um motor de regras nem uma eliminacao automatica.
+
+**SAVE MATCH: OFF / ON**, no menu da vida, decide se vida, dano de comandante e marcadores voltam depois de reiniciar; o menu continua aberto para mostrar o novo estado. O padrao e **OFF**. Ativar **ON** salva a partida atual imediatamente; as proximas alteracoes sao salvas apos 1,5 segundo sem edicoes. Voltar para **OFF** remove a partida salva imediatamente, mas mantem a partida atual na RAM; ao reiniciar, comeca uma partida nova usando os padroes salvos de jogadores e vida inicial. Os decks e os saves existentes dos tokens independem dessa opcao. Aguarde pelo menos 1,5 segundo apos editar antes de desligar; erros de armazenamento aparecem no cabecalho das telas de mesa e no serial.
 
 ### Dados e moeda
 
@@ -431,7 +435,7 @@ g++ -std=c++11 -Wall -Wextra -Werror tools\test_table_state.cpp -o "%TEMP%\test_
 "%TEMP%\test_table_state.exe"
 ```
 
-Os testes cobrem inclusao de tokens e navegacao circular dos decks, os oito jogadores e seus dois comandantes, ajustes e limites de vida, o limite de 21 por comandante, validacao do formato salvo e faixas/rejeicao dos dados.
+Os testes cobrem inclusao de tokens e navegacao circular dos decks, os oito jogadores e seus dois comandantes, ajustes e limites de vida, o limite de 21 por comandante, marcadores dos jogadores (veneno letal com 10, monarca/iniciativa, saves antigos sem marcadores), validacao do formato salvo e faixas/rejeicao dos dados.
 
 Testes do gerador do catalogo:
 

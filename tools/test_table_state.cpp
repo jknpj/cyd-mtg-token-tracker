@@ -6,7 +6,8 @@
 int main() {
   using namespace tabletop;
   static_assert(sizeof(DeckBook) == 1236, "deck save layout changed");
-  static_assert(sizeof(Match) == 280, "match save layout changed");
+  static_assert(sizeof(Match) == 364, "match save layout changed");
+  static_assert(MATCH_V1_SIZE == 280, "version 1 match saves must still load");
   DeckBook book;
   assert(book.count(456) == 456);
   book.active = 1;
@@ -76,8 +77,49 @@ int main() {
   restored.initialLife = 0;
   assert(!restored.valid());
   restored = match;
-  restored.version = 2;
+  restored.version = 3;
   assert(!restored.valid());
+
+  // Player counters clamp, poison is lethal at 10, and the monarch/initiative have one holder.
+  match.reset(4, 40);
+  assert(!match.adjustCounter(0, Poison, -1) && match.counters[0][Poison] == 0);
+  assert(match.adjustCounter(0, Poison, 9) && !match.poisoned(0));
+  assert(match.adjustCounter(0, Poison, 1) && match.poisoned(0));
+  assert(match.adjustCounter(3, Energy, 5000) && match.counters[3][Energy] == PLAYER_COUNTER_LIMIT);
+  assert(!match.adjustCounter(4, Rad, 1) && !match.adjustCounter(0, PLAYER_COUNTER_KINDS, 1));
+  match.toggleHolder(match.monarch, 2);
+  assert(match.monarch == 2);
+  match.toggleHolder(match.monarch, 1);
+  assert(match.monarch == 1);
+  match.toggleHolder(match.monarch, 1);
+  assert(match.monarch == -1);
+  match.toggleHolder(match.initiative, 7);
+  assert(match.initiative == -1);
+  match.toggleHolder(match.initiative, 3);
+  assert(match.valid());
+  match.initiative = 4;
+  assert(!match.valid());
+  match.initiative = 3;
+  match.counters[1][Emblems] = PLAYER_COUNTER_LIMIT + 1;
+  assert(!match.valid());
+  match.reset(3, 20);
+  assert(match.counters[0][Poison] == 0 && match.monarch == -1 && match.initiative == -1 && match.valid());
+
+  // Saves of both layouts restore; a version 1 save gets empty player counters.
+  Match saved;
+  saved.reset(2, 30);
+  saved.adjustCounter(1, Experience, 3);
+  Match loaded;
+  assert(loadMatch(loaded, &saved, sizeof(saved)) && loaded.counters[1][Experience] == 3);
+  uint8_t old[MATCH_V1_SIZE];
+  memcpy(old, &saved, sizeof(old));
+  const uint32_t one = 1;
+  memcpy(old, &one, sizeof(one));
+  assert(loadMatch(loaded, old, sizeof(old)));
+  assert(loaded.version == Match::VERSION && loaded.players == 2 && loaded.life[1] == 30);
+  assert(loaded.counters[1][Experience] == 0 && loaded.monarch == -1);
+  assert(!loadMatch(loaded, &saved, MATCH_V1_SIZE));  // A version 2 header with the old length.
+  assert(!loadMatch(loaded, &saved, sizeof(saved) - 1));
 
   for (uint8_t sides : DIE_SIDES) {
     int counts[21] = {};

@@ -15,7 +15,7 @@ An offline Magic: The Gathering table companion for the cheap **CYD ESP32-2432S0
 
 - **Token board**: 455 tokens from every Commander precon, plus your own custom token. Track how many are in play, how many are tapped, counters, and power/toughness.
 - **Decks and precons**: import the tokens of any of **198 Commander precons** with one tap, or build up to eight decks of your own.
-- **Life counter**: big, colorful panels for **1 to 8 players**, each facing its seat, with commander damage (partners included) and a random "who starts?" pick.
+- **Life counter**: big, colorful panels for **1 to 8 players**, each facing its seat, with commander damage (partners included), poison, rad, energy, experience, emblems, Monarch and Initiative, and a random "who starts?" pick.
 - **3D dice and coins**: d4 to d20 and coins, up to 20 at a time, with a tumbling 3D toss.
 - **Doodles**: draw moustaches (or anything else) on your tokens.
 - **Everything is saved** between sessions: tokens, counters, decks, settings, and optionally the match in progress.
@@ -47,15 +47,15 @@ An offline Magic: The Gathering table companion for the cheap **CYD ESP32-2432S0
 
 **Life, dice, and coins**
 
-| Life counter | Commander damage | Life menu |
+| Life counter | Player counters | Commander damage |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/life-counter.png" alt="Four players mid-game, with player 2 marked FIRST" width="200"> | <img src="docs/screenshots/commander-damage.png" alt="Recording commander damage dealt to player 3: player 1 has dealt 7" width="200"> | <img src="docs/screenshots/life-menu.png" alt="Life menu: Dice / Coin, Who starts?, New game, Save match, Main menu, Close" width="200"> |
-| Tap the left half for -1, right for +1 | Track damage from each commander | Who starts, new game, and more |
+| <img src="docs/screenshots/life-counter.png" alt="Four players mid-game; player 1 is the Monarch with 3 poison, 2 energy, and 1 emblem" width="200"> | <img src="docs/screenshots/player-counters.png" alt="Player 1 counters: poison 3, energy 3, emblems 1, Monarch on" width="200"> | <img src="docs/screenshots/commander-damage.png" alt="Recording commander damage dealt to player 3: player 1 has dealt 7" width="200"> |
+| Tap the left half for -1, right for +1 | Poison, energy, emblems, Monarch... | Track damage from each commander |
 
-| Dice | Coins |
-| :---: | :---: |
-| <img src="docs/screenshots/dice.png" alt="Three d20s rolled for a total of 13" width="200"> | <img src="docs/screenshots/coins.png" alt="Three coins flipped: one gold heads and two silver tails" width="200"> |
-| d4 to d20, up to 20 at once | Heads and tails, counted for you |
+| Life menu | New game | Dice | Coins |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/life-menu.png" alt="Life menu: Dice / Coin, Who starts?, Players / New game, Save match, Main menu, Close" width="170"> | <img src="docs/screenshots/match-setup.png" alt="New match: 4 players, initial life 40, with 20/25/30/40 presets" width="170"> | <img src="docs/screenshots/dice.png" alt="Three d20s rolled for a total of 13" width="170"> | <img src="docs/screenshots/coins.png" alt="Three coins flipped: one gold heads and two silver tails" width="170"> |
+| Who starts, players, and more | 1 to 8 players, any starting life | d4 to d20, up to 20 at once | Heads and tails, counted for you |
 
 **Looks and settings**
 
@@ -113,8 +113,8 @@ The board starts at the **MAIN MENU**. Pick a mode; you can switch at any time w
 
 1. Tap **LIFE COUNTER**. Seat everyone around the board: each panel faces its player.
 2. Tap the **left half** of a panel for **-1** and the **right half** for **+1**; hold to go faster.
-3. Tap a player's **name strip** to record commander damage dealt to them.
-4. The round button in the middle opens **WHO STARTS?**, **NEW GAME** (players and starting life), dice, and more.
+3. Tap a player's **name** (`P1`) in the strip for poison, rad, energy, experience, emblems, Monarch, and Initiative; tap **CMD** to record commander damage dealt to them.
+4. The round button in the middle opens **WHO STARTS?**, **PLAYERS / NEW GAME** (1 to 8 players and starting life), dice, and more.
 
 **Dice and coins**
 
@@ -287,14 +287,18 @@ Decks and precons belong to token mode: open them from the token menu (**DECKS /
 Open **LIFE COUNTER** from the main menu. Each of the **1-8 players** gets a colored panel turned to face their seat around the device: the first player at the bottom (or bottom-left), then clockwise up the left side and down the right; with two players, the second panel faces the top.
 
 - Tap the **left half** of a panel for **-1** and the **right half** for **+1**. Hold to repeat; after a few repeats it steps by **10**. A yellow bubble in the panel shows the running change (`+3`, `-7`) and fades about 2.5 seconds after the last tap.
-- A panel turns dark with a light-red number when that player is at **0 or less** or has taken **21** from one commander.
-- The round **menu button** in the middle opens **DICE / COIN**, **WHO STARTS?** (a highlight circles the table, slows down and stops on a random player, marked `FIRST`; the next tap clears it), **NEW GAME**, **SAVE MATCH: ON / OFF**, **MAIN MENU**, and **CLOSE**. Tap outside the menu to close it.
+- A panel turns dark with a light-red number when that player is at **0 or less**, has **10 poison**, or has taken **21** from one commander.
+- The round **menu button** in the middle opens **DICE / COIN**, **WHO STARTS?** (a highlight circles the table, slows down and stops on a random player, marked `FIRST`; the next tap clears it), **PLAYERS / NEW GAME**, **SAVE MATCH: ON / OFF**, **MAIN MENU**, and **CLOSE**. Tap outside the menu to close it.
 
-**NEW GAME** selects player count and initial life, with **20 / 25 / 30 / 40** presets and fine adjustment from **1 to 9999**. **START** asks for confirmation before resetting all players' life and commander damage; token state is not reset. Player count and initial-life defaults are saved even when match restoration is off.
+**PLAYERS / NEW GAME** selects the player count (**1 to 8**, so you can drop to three players when someone leaves) and initial life, with **20 / 25 / 30 / 40** presets and fine adjustment from **1 to 9999**. **START** asks for confirmation before resetting all players' life, commander damage, and counters; token state is not reset. Player count and initial-life defaults are saved even when match restoration is off.
 
-The strip at the bottom of each panel shows `P1`-`P8` and a **CMD** pill with the most damage that player has taken from a single commander. **Tap the strip** to record commander damage dealt **to** that player: the other panels darken and show how much each of them has dealt (`TO P2`); their **+ / -** halves add or remove that damage, which also adjusts the recipient's life. Tap a source's strip to switch between its **C1** and **C2** (partners); their damage is never combined for the 21 threshold. Tap the recipient's panel (`DONE`) or the check button in the middle to go back. Life supports **-9999 to 9999**, and each commander-damage entry supports **0-999**. This is manual bookkeeping, not a rules engine or automatic player elimination.
+The strip at the bottom of each panel shows the player's name (`P1`-`P8`, outlined like a button) and a **CMD** pill with the most damage that player has taken from a single commander.
 
-**SAVE MATCH: OFF / ON** in the life menu controls restart restoration of life and commander damage; the menu stays open so you can see the new state. It defaults to **OFF**. Turning it **ON** saves the current match immediately; later changes save after 1.5 seconds of inactivity. Turning it **OFF** removes the saved match immediately, but leaves the current match in RAM; after restarting, a fresh match uses the saved player-count and initial-life defaults. Decks and existing token saves are independent of this setting. Wait at least 1.5 seconds after edits before cutting power; storage errors appear in the table header and serial log.
+**Player counters.** Tap the **name** (`P1`) to open that player's counters page, turned to face them: **POISON**, **RAD**, **ENERGY**, **EXPERIENCE**, and **EMBLEMS** with **-** / **+** (hold to repeat, **0-999**), plus **MONARCH** and **INITIATIVE**. Only one player holds each designation: giving it to someone takes it from the previous holder, and tapping it again clears it. **DONE** returns to the table. Back on the panel, a pill above the life total sums it up (`MONARCH  PSN 3  EN 3  EMB 1`); a `+` means more counters than fit.
+
+**Commander damage.** Tap **CMD** (with one player, the whole strip opens the counters instead) to record commander damage dealt **to** that player: the other panels darken and show how much each of them has dealt (`TO P2`); their **+ / -** halves add or remove that damage, which also adjusts the recipient's life. Tap a source's strip to switch between its **C1** and **C2** (partners); their damage is never combined for the 21 threshold. Tap the recipient's panel (`DONE`) or the check button in the middle to go back. Life supports **-9999 to 9999**, and each commander-damage entry supports **0-999**. This is manual bookkeeping, not a rules engine or automatic player elimination.
+
+**SAVE MATCH: OFF / ON** in the life menu controls restart restoration of life, commander damage, and player counters; the menu stays open so you can see the new state. It defaults to **OFF**. Turning it **ON** saves the current match immediately; later changes save after 1.5 seconds of inactivity. Turning it **OFF** removes the saved match immediately, but leaves the current match in RAM; after restarting, a fresh match uses the saved player-count and initial-life defaults. Decks and existing token saves are independent of this setting. Wait at least 1.5 seconds after edits before cutting power; storage errors appear in the table header and serial log.
 
 ### Dice and coins
 
@@ -431,7 +435,7 @@ g++ -std=c++11 -Wall -Wextra -Werror tools\test_table_state.cpp -o "%TEMP%\test_
 "%TEMP%\test_table_state.exe"
 ```
 
-These tests cover deck membership and wraparound, all eight players and both commanders, life adjustments and limits, the per-commander 21 threshold, save-layout validation, and die-face ranges/rejection.
+These tests cover deck membership and wraparound, all eight players and both commanders, life adjustments and limits, the per-commander 21 threshold, player counters (lethal 10 poison, Monarch/Initiative, older saves without counters), save-layout validation, and die-face ranges/rejection.
 
 Catalog-generator tests:
 

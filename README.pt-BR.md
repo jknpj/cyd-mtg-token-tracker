@@ -1,22 +1,24 @@
-# CYD MTG Token Tracker
+# CYD MTG Table Companion
 
 **Português (Brasil)** | [English](README.md)
 
-**Seus tokens em uma tela touch de 2,8 polegadas. Sem celular, Wi-Fi ou conta durante a partida.**
+**Tokens, pontos de vida, dano de comandante e dados para a sua mesa de Magic, tudo em uma tela touch de 2,8 polegadas. Sem celular, Wi-Fi ou conta durante a partida.**
 
-Um rastreador offline de tokens de Magic: The Gathering para o **CYD ESP32-2432S028R**. Escolha os tokens, ajuste quantidades e copias viradas, adicione marcadores e mantenha tudo salvo entre as partidas.
+Um companheiro de mesa offline de Magic: The Gathering para o **CYD ESP32-2432S028R** (antigo *CYD MTG Token Tracker*). Comecou como um painel de tokens e agora cuida da mesa inteira: monte decks de tokens ou importe qualquer um dos 198 precons de Commander, acompanhe vida e dano de comandantes parceiros para ate oito jogadores e jogue dados e moedas em 3D. Tudo fica salvo entre as partidas.
 
 | Em resumo | |
 | --- | --- |
-| **455 entradas + Custom** | Tokens e emblemas cobrindo 198 listas de precons de Commander na snapshot de 24/10/2026 |
-| **Tres layouts** | Controles no Classic, Overlay em tela cheia ou Card only sem controles sobre a carta |
-| **Marcadores e P/T** | +1/+1, marcadores com nome, de habilidade e bonus "para cada" reconhecidos |
+| **Painel de tokens** | 455 entradas + Custom, cobrindo 198 listas de precons de Commander na snapshot de 24/10/2026; quantidades, copias viradas, marcadores e P/T |
+| **Decks e precons** | Oito decks de tokens com nome, com importacao de qualquer um dos 198 precons de Commander com um toque |
+| **Contador de vida** | Paineis grandes de toque para ate oito jogadores, com dano de comandantes parceiros, sorteio de "quem comeca?" e salvamento opcional da partida |
+| **Dados e moedas em 3D** | d4 a d20 e moedas, de 1 a 20 por vez, lancados com um giro 3D sombreado que para no resultado |
+| **Tres layouts de carta** | Controles no Classic, Overlay em tela cheia ou Card only sem controles sobre a carta |
 | **Desenhe nos tokens** | Desenho na arte ou na carta inteira: oito cores, tres pinceis, borracha, desfazer e salvamento na RAM, flash ou microSD |
 | **Busca rapida** | Nome, tipo, texto, cor e P/T pelo teclado na tela |
 | **Arte opcional no microSD** | JPEGs de maior qualidade, com retorno automatico para a arte embutida |
-| **Estado persistente** | Quantidades, marcadores, token personalizado e preferencias de tela salvos na flash |
+| **Estado persistente** | Quantidades, marcadores, decks, token personalizado e preferencias de tela salvos na flash |
 
-[Tour da interface](#tour-da-interface) · [Inicio rapido](#inicio-rapido) · [Controles](#controles) · [Desenhos](#modo-de-desenho) · [microSD](#arte-em-alta-qualidade-no-microsd) · [Configuracoes](#configuracoes) · [Catalogo e desenvolvimento](#catalogo-de-tokens)
+[Tour da interface](#tour-da-interface) · [Inicio rapido](#inicio-rapido) · [Controles](#controles) · [Mesa](#ferramentas-de-mesa) · [Desenhos](#modo-de-desenho) · [microSD](#arte-em-alta-qualidade-no-microsd) · [Configuracoes](#configuracoes) · [Catalogo e desenvolvimento](#catalogo-de-tokens)
 
 ## Tour da interface
 
@@ -64,11 +66,39 @@ O [platformio.ini](platformio.ini) configura as duas portas USB como **COM7**. A
 
 ### 3. Comece a jogar
 
+O aparelho inicia no **MAIN MENU**: **TOKENS**, **LIFE COUNTER**, **DICE / COIN** ou **SETTINGS** (so a tela). Cada modo tem seu proprio menu, e o **MAIN MENU** dele volta para ca. Trocar de modo nao zera os tokens nem a partida atual.
+
 1. Toque no **nome** da carta para escolher um token ou use a **lupa** para buscar.
 2. Use **+ / -** para mudar a quantidade; o botao central alterna entre `QTY`, `TAP`, `POW` e `TGH`.
 3. Toque na **arte** para virar ou desvirar o grupo.
 4. Toque na **caixa de texto** para adicionar marcadores. No `Custom`, use a faixa inferior; a caixa de texto abre o editor.
-5. Abra a **engrenagem** para escolher o layout e ajustar a tela. As mudancas sao salvas automaticamente.
+5. Toque no **icone de menu** para abrir o menu de tokens: decks e precons, opcoes da carta (layout, tom, desenhos) ou voltar ao menu principal. As mudancas sao salvas automaticamente.
+
+```mermaid
+flowchart TD
+  Home[MAIN MENU] --> Card[Carta do token]
+  Home --> Life[Contador de vida]
+  Home --> Dice[Dados / moeda]
+  Home --> Settings[Settings: brilho, desligamento, orientacao, gamma]
+  Card -- icone de menu --> TokenMenu{{Menu de tokens}}
+  TokenMenu --> Picker[Lista de tokens]
+  TokenMenu --> Decks[Decks]
+  TokenMenu --> CardOptions[Card options: layout, tom, desenhos]
+  TokenMenu --> Home
+  Card -- barra do nome --> Picker
+  Card -- caixa de texto --> Counters[Contadores]
+  Card -- segurar arte / DRAW --> Drawing[Desenho]
+  Picker -- DECKS --> Decks
+  Decks -- NEW --> Precons[Lista de precons]
+  Precons -- EMPTY --> Name[Nomear deck vazio]
+  Decks -- EDIT --> Picker
+  Life -- botao redondo --> LifeMenu{{Menu da vida}}
+  LifeMenu --> Dice
+  LifeMenu --> NewGame[Nova partida]
+  LifeMenu --> Home
+```
+
+Todo **BACK** volta um passo: settings para o menu principal; card options, decks, a lista e os contadores para a carta; precons para os decks; e os dados para onde foram abertos.
 
 ## Hardware
 
@@ -86,22 +116,22 @@ O firmware troca os pinos do VSPI ao acessar o SD e depois restaura os do touch.
 O token aparece como uma carta em modo retrato. No layout **Classic** (o padrao) ha uma barra inferior com estes botoes:
 
 - **<** / **>**: token anterior / proximo.
-- Botao central: alterna o que **-** e **+** editam: `QTY` (quantidade em jogo), `TAP` (quantos estao virados), `POW` e `TGH` (modificadores de poder/resistencia, so em criaturas). O item em edicao fica destacado em amarelo na carta (P/T ou icone de virados); a quantidade nao tem destaque, para nao emoldurar a arte, e o modo atual aparece escrito no botao. Os marcadores (+1/+1 e os demais) ficam na tela de **contadores**, abaixo.
+- Botao central: alterna o que **-** e **+** editam: `QTY` (quantidade em jogo), `TAP` (quantos estao virados), `POW` e `TGH` (modificadores de poder/resistencia, so em criaturas). Em `QTY`, toque no grupo de icones desvirados ou virados na arte para escolher qual tipo de copia **+ / -** adiciona ou remove; o grupo escolhido fica destacado. O modo atual aparece no botao. Os marcadores (+1/+1 e os demais) ficam na tela de **contadores**, abaixo.
 - Tocar na area da arte vira todos os tokens desvirados ou, se ja estiverem todos virados, desvira todos.
-- Tocar na barra do nome abre a lista de tokens, em paginas. Toque num nome para seleciona-lo; **<** / **>** trocam de pagina, **FIND** abre a busca, **BACK** volta para a carta e **SET** abre as configuracoes.
-- A engrenagem, na margem superior esquerda ao lado da carta, abre as **configuracoes** e a lupa, na margem superior direita, abre a **busca**. Nos outros layouts os dois icones ficam entre os botoes sobre a arte.
+- Tocar na barra do nome abre a lista de tokens, em paginas. Toque num nome para seleciona-lo; **<** / **>** trocam de pagina, **FIND** abre a busca, **BACK** volta para a carta e **DECKS** abre os seus [decks de tokens](#decks-de-tokens).
+- O icone de menu, na margem superior esquerda ao lado da carta, abre o **menu de tokens** (**CHOOSE TOKEN**, **DECKS / PRECONS**, **CARD OPTIONS**, **MAIN MENU**, **CLOSE**; toque fora dele para fechar) e a lupa, na margem superior direita, abre a **busca**. Nos outros layouts os dois icones ficam entre os botoes sobre a arte.
 
-Na arte, "IN PLAY", a quantidade e os icones de desvirado e virado so aparecem quando ha mais de um token daquele tipo em jogo; com 0 ou 1, a quantidade aparece por 2 segundos depois de ser ajustada e some em seguida, deixando a arte limpa. Ao remover tokens, os desvirados saem primeiro. O indicador de posicao (por exemplo, `1/76`) aparece brevemente ao trocar de token e depois some. O icone de mana no canto do nome indica a cor: sol (branco), gota (azul), caveira (preto), chama (vermelho), arvore (verde), roda de cinco pontos coloridos (multicolor) e losango (incolor). Os mesmos icones aparecem na lista e no seletor de cor do editor.
+Os grupos de icones desvirado/virado permanecem visiveis em todos os modos enquanto houver ao menos uma copia em jogo. Com zero copias, **Card Only** oculta os dois grupos; voltar para `QTY`, usar **+ / -** ou escolher um grupo mostra ou mantem os icones por 2 segundos. Assim da para escolher como a primeira copia entra sem deixar icones numa mesa vazia. Classic e Overlay mantem os grupos vazios visiveis em `QTY`. "IN PLAY" e a quantidade aparecem quando ha mais de um token; com 0 ou 1, a quantidade aparece por 2 segundos depois de uma interacao de quantidade e some em seguida, deixando a arte limpa. O grupo escolhido determina se **+ / -** adiciona ou remove copias viradas ou desviradas. O indicador de posicao (por exemplo, `1/76`) aparece brevemente ao trocar de token e depois some. O icone de mana no canto do nome indica a cor: sol (branco), gota (azul), caveira (preto), chama (vermelho), arvore (verde), roda de cinco pontos coloridos (multicolor) e losango (incolor). Os mesmos icones aparecem na lista e no seletor de cor do editor.
 
 O primeiro item da lista, `Custom`, e um token editavel: com ele selecionado, toque na parte de baixo da carta (tipo e texto) para abrir o editor de nome, linha de tipo, texto, cor e P/T. Os campos de texto usam um teclado na tela, e **SAVE** grava o token na flash.
 
 O P/T exibido ja soma os marcadores e os modificadores. Tokens sem P/T (artefatos) editam apenas quantidade e tapped.
 
-Tokens com P/T variavel preservam os simbolos impressos (`*/*`, `*/1+*` etc.), em vez de fingir que sao 0/0. Seus modificadores aparecem junto do simbolo; o rastreador nao conhece zonas como cemiterios ou a vida dos jogadores para resolver essas habilidades sozinho. Cragflame e um Equipment: seu texto aparece na carta, mas equipar e aplicar seu bonus a outra criatura continuam sendo acoes manuais.
+Tokens com P/T variavel preservam os simbolos impressos (`*/*`, `*/1+*` etc.), em vez de fingir que sao 0/0. Seus modificadores aparecem junto do simbolo; o painel de tokens nao conhece cemiterios e nao le os totais do contador de vida para resolver essas habilidades sozinho. Cragflame e um Equipment: seu texto aparece na carta, mas equipar e aplicar seu bonus a outra criatura continuam sendo acoes manuais.
 
 ## Modo de desenho
 
-Bigodes sao bem-vindos. **Segure a arte por cerca de um segundo**, ou abra os **Contadores** e toque em **DRAW**, para decorar o token selecionado. O **DRAW** das **Configuracoes** tambem sempre funciona. A pagina 4 das configuracoes escolhe [como o desenho comeca, onde a tinta vai e onde ela e salva](#pagina-4-desenhos).
+Bigodes sao bem-vindos. **Segure a arte por cerca de um segundo**, ou abra os **Contadores** e toque em **DRAW**, para decorar o token selecionado. A pagina 3 do **CARD OPTIONS** escolhe [como o desenho comeca, onde a tinta vai e onde ela e salva](#card-options-pagina-3-desenhos).
 
 <img src="docs/screenshots/drawing.png" alt="Modo de desenho com rosto e bigode desenhados sobre um token personalizado e botoes Back, Pen, Undo, Clear e Save" width="240"> <img src="docs/screenshots/drawing-palette.png" alt="Pop-up do PEN sobre o desenho com oito cores, tres pinceis e a borracha" width="240">
 
@@ -152,7 +182,7 @@ Na carta, os contadores diferentes de +1/+1 aparecem como selos na parte de baix
 
 Nas criaturas, a ultima linha da tela de contadores e `Food (Ygra)`. **+** ativa e **-** remove a marca (0/1). Ela vale para todas as copias daquele token, inclusive copias adicionadas depois, ate voce remove-la. Nao cria um token Food separado e nao remove os tipos originais.
 
-A criatura marcada ganha `Artifact` e `Food` na linha de tipo e um selo `Food (Ygra)`. Passa a contar uma vez para bonus que contam artefatos/Foods (por exemplo, Construct) e tambem aparece nessas buscas. A marca fica salva depois de reiniciar. Remova-a quando o efeito de Ygra deixar de valer. O custo de Food (`2, T, sacrificar: ganhar 3 de vida`) e as acoes de sacrificar/ganhar vida ainda sao executados manualmente na partida; o rastreador nao controla a vida.
+A criatura marcada ganha `Artifact` e `Food` na linha de tipo e um selo `Food (Ygra)`. Passa a contar uma vez para bonus que contam artefatos/Foods (por exemplo, Construct) e tambem aparece nessas buscas. A marca fica salva depois de reiniciar. Remova-a quando o efeito de Ygra deixar de valer. O custo de Food (`2, T, sacrificar: ganhar 3 de vida`) e as acoes de sacrificar/ganhar vida ainda sao executados manualmente na partida; o painel de tokens nao se liga ao contador de vida, entao ajuste a vida la manualmente.
 
 ## Bonus automaticos e limites das regras
 
@@ -163,7 +193,7 @@ Tokens com texto do tipo "gets +1/+1 for each [other] TIPO you control" tem o P/
 
 O bonus atual aparece como um selo verde (ex.: `Rats +4/+4`) e ja entra no P/T. Para permanentes que nao sao tokens (o proprio Vren, artefatos de verdade), use a linha `Rat cards` / `Artifact cards` na tela de contadores desse token. Com quantidade 0, o P/T mostrado e o que o token teria ao entrar. Habilidades de Roles e auras nao sao calculadas. O `Custom` tambem e lido, entao uma criatura personalizada com esse texto funciona igual.
 
-> **Um rastreador, nao um motor completo de regras.** Os tokens Cat/Dog de Rin and Seri e Cragflame de Mabel estao no catalogo, mas habilidades desencadeadas, equipar, sacrificar, totais de vida e outras zonas do jogo ainda dependem do jogador. A marca de Ygra e manual: ela nao detecta a entrada ou saida de Ygra do campo.
+> **Um companheiro de mesa, nao um motor completo de regras.** Os tokens Cat/Dog de Rin and Seri e Cragflame de Mabel estao no catalogo, mas habilidades desencadeadas, equipar, sacrificar, mudancas de vida vindas de efeitos de tokens e outras zonas do jogo ainda dependem do jogador. A marca de Ygra e manual: ela nao detecta a entrada ou saida de Ygra do campo.
 
 ## Arte
 
@@ -171,7 +201,7 @@ Cada token mostra a ilustracao da sua impressao no Scryfall, com o nome do ilust
 
 Para caber na flash com mais de 450 tokens, cada token guarda uma unica JPEG, no tamanho da arte dos layouts de tela cheia (214x128, cor em 4:2:0). O layout Classic reduz essa imagem na propria placa para 164x96. O gerador baixa a qualidade JPEG de 5 em 5 so ate tudo caber; a qualidade usada fica anotada no topo de `src/token_art_generated.h`. A qualidade original (85) para todos os tokens precisaria de 4 a 8 MB, mais do que a flash de 4 MB da placa.
 
-O script ajusta as imagens para a tela: recorta para a caixa da arte e escurece os tons medios das artes muito claras (`ART_MAX_MEAN`), que estouram no painel TN do CYD. As cores desse painel tambem mudam bastante com o angulo de visao: com a placa deitada na mesa a carta fica lavada, e as cartas brancas estouram. Por isso a moldura branca e um creme (e nao o branco mais claro que o painel mostra) e ha **CARD TONE** e **SCREEN** na segunda pagina das configuracoes. Se todas as cores (e nao so as claras) parecem estouradas, veja **DISPLAY GAMMA**, na terceira pagina. A aplicacao tem uma particao de 3 MiB em [partitions.csv](partitions.csv); as artes deixam a gravacao maior e mais demorada.
+O script ajusta as imagens para a tela: recorta para a caixa da arte e escurece os tons medios das artes muito claras (`ART_MAX_MEAN`), que estouram no painel TN do CYD. As cores desse painel tambem mudam bastante com o angulo de visao: com a placa deitada na mesa a carta fica lavada, e as cartas brancas estouram. Por isso a moldura branca e um creme (e nao o branco mais claro que o painel mostra) e ha **CARD TONE** (no **CARD OPTIONS** do menu de tokens) e **SCREEN** (na primeira pagina do **SETTINGS**). Se todas as cores (e nao so as claras) parecem estouradas, veja **DISPLAY GAMMA**, na segunda pagina do **SETTINGS**. A aplicacao tem uma particao de 3 MiB em [partitions.csv](partitions.csv); as artes deixam a gravacao maior e mais demorada.
 
 ### Arte em alta qualidade no microSD
 
@@ -208,33 +238,62 @@ O gerador tambem grava a arte de todos os tokens em **JPEG qualidade 90, cor 4:4
 
 Quantidades, marcadores, modificadores e o token selecionado ficam salvos na flash (NVS) e sao restaurados ao religar a placa.
 
+## Ferramentas de mesa
+
+Decks e precons fazem parte do modo de tokens: abra pelo menu de tokens (**DECKS / PRECONS**) ou com **DECKS** na lista de tokens. O contador de vida e os dados tem entradas proprias no menu principal.
+
+### Decks de tokens
+
+- **DECKS** oferece ate **oito decks com nome**, alem de **ALL TOKENS**. Toque numa linha para ativa-la; **BACK** volta para a carta com esse deck.
+- **NEW** abre a [lista de precons](#decks-de-precon) para importar um deck; o botao **EMPTY** dela cria um deck vazio e abre o teclado de nome. **NAME** renomeia o deck ativo.
+- **EDIT** abre o catalogo completo. Toque nos tokens para incluir ou remover (`YES` indica incluido); **FIND** pesquisa o catalogo completo durante a edicao. **BACK** volta aos decks.
+- **DEL** pede confirmacao e remove somente o filtro daquele deck.
+- Fora da edicao, a navegacao, os resultados da busca e o indicador de posicao respeitam o deck ativo. Um deck vazio volta ao gerenciamento em vez de mostrar um token de fora dele.
+- Artes, quantidades, copias viradas, marcadores e o token personalizado continuam compartilhados. Um token pode estar em varios decks. Os decks e o filtro ativo sao sempre salvos.
+
+### Decks de precon
+
+- **NEW** em **DECKS** lista os **198 precons de Commander** da snapshot do catalogo, do mais novo ao mais antigo, com codigo do set, ano e quantidade de tokens. **< / >** mudam de pagina; **FIND** pesquisa por nome, codigo do set ou ano (por exemplo `BLC`, `2024 dragons`). **EMPTY** cria um deck vazio em vez disso, e **BACK** volta aos decks.
+- Toque num precon para **importa-lo** num slot livre e ativa-lo. Precons que ja estao num slot aparecem destacados; importar de novo atualiza esse slot. O **NEW** precisa de um slot livre: se os oito estiverem ocupados, apague um com **DEL** antes.
+- Um precon importado e um deck normal: pode ser renomeado, ajustado com **EDIT** ou apagado. Nomes com mais de 24 caracteres sao encurtados.
+- A lista traz os tokens que o Scryfall liga as cartas de cada decklist. Efeitos que apenas copiam permanentes, ou que criam tokens sem carta ligada, podem precisar de **EDIT**.
+
+### Vida e dano de comandante
+
+Abra **LIFE COUNTER** no menu principal. Cada um dos **1 a 8 jogadores** ganha um painel colorido virado para o seu lugar em volta do aparelho: o primeiro embaixo (ou embaixo a esquerda) e os demais em sentido horario, subindo pela esquerda e descendo pela direita; com dois jogadores, o segundo painel fica virado para cima.
+
+- Toque na **metade esquerda** de um painel para **-1** e na **metade direita** para **+1**. Segure para repetir; depois de algumas repeticoes o passo vira **10**. Uma bolha amarela mostra a variacao acumulada (`+3`, `-7`) e some cerca de 2,5 segundos apos o ultimo toque.
+- O painel escurece e o numero fica vermelho claro quando o jogador esta com **0 ou menos** ou levou **21** de um mesmo comandante.
+- O **botao redondo** no meio abre **DICE / COIN**, **WHO STARTS?** (um destaque gira pela mesa, desacelera e para num jogador aleatorio, marcado com `FIRST`; o proximo toque limpa), **NEW GAME**, **SAVE MATCH: ON / OFF**, **MAIN MENU** e **CLOSE**. Toque fora do menu para fecha-lo.
+
+**NEW GAME** escolhe o numero de jogadores e a vida inicial, com atalhos **20 / 25 / 30 / 40** e ajuste fino de **1 a 9999**. **START** pede confirmacao antes de restaurar a vida inicial e zerar o dano de comandante; nao altera os tokens. O numero de jogadores e a vida inicial escolhidos ficam salvos mesmo com a restauracao da partida desligada.
+
+A faixa na base de cada painel mostra `P1` a `P8` e uma pilula **CMD** com o maior dano que esse jogador levou de um unico comandante. **Toque na faixa** para registrar dano de comandante **recebido** por esse jogador: os outros paineis escurecem e mostram quanto cada um causou (`TO P2`); as metades **+ / -** deles somam ou tiram esse dano, o que tambem ajusta a vida de quem recebe. Toque na faixa de uma origem para alternar entre **C1** e **C2** (parceiros); os danos dos parceiros nunca sao somados para o limite de 21. Toque no painel de quem recebe (`DONE`) ou no botao de confirmacao no meio para voltar. A vida aceita **-9999 a 9999**, e cada registro de dano de comandante aceita **0 a 999**. E um controle manual, nao um motor de regras nem uma eliminacao automatica.
+
+**SAVE MATCH: OFF / ON**, no menu da vida, decide se vida e dano de comandante voltam depois de reiniciar; o menu continua aberto para mostrar o novo estado. O padrao e **OFF**. Ativar **ON** salva a partida atual imediatamente; as proximas alteracoes sao salvas apos 1,5 segundo sem edicoes. Voltar para **OFF** remove a partida salva imediatamente, mas mantem a partida atual na RAM; ao reiniciar, comeca uma partida nova usando os padroes salvos de jogadores e vida inicial. Os decks e os saves existentes dos tokens independem dessa opcao. Aguarde pelo menos 1,5 segundo apos editar antes de desligar; erros de armazenamento aparecem no cabecalho das telas de mesa e no serial.
+
+### Dados e moeda
+
+**DICE / COIN** (no menu principal e no menu da vida) oferece **COIN, d4, d6, d8, d10, d12 e d20**, com **1 a 20** lancamentos por vez. **ROLL** (ou **FLIP** para moedas), ou um toque na area de resultados, lanca os dados em 3D por cerca de um segundo: cada dado entra voando, faz um arco em sua direcao com uma sombra que cresce, quica uma vez e gira ate parar no resultado. Os dados sao poliedros reais com sombreamento (tetraedro no d4, cubo com pontos no d6 e faces opostas somando 7, octaedro no d8, faces em pipa no d10, dodecaedro no d12, icosaedro no d20) iluminados pelo canto superior esquerdo; as moedas giram de ponta a ponta mostrando a borda e caem com cara dourada ou coroa prateada. A soma ou a contagem de caras/coroas aparece acima. Os resultados continuam visiveis durante a sessao, identificados pelo tipo e quantidade efetivamente lancados, mesmo que voce altere as opcoes da proxima rolagem. Nao sao restaurados depois de reiniciar. **BACK** volta para onde os dados foram abertos: o menu principal ou o contador de vida. As rolagens usam o gerador aleatorio do ESP32 com amostragem por rejeicao para evitar vies de modulo.
+
 ## Configuracoes
 
-A engrenagem (ou o botao **SET** da lista de tokens) abre a tela de configuracoes. Ela tem quatro paginas; **<** / **>** trocam de pagina, **DRAW** abre o modo de desenho do token selecionado e **BACK** volta.
+Ha duas telas de configuracao, cada uma com **<** / **>** para trocar de pagina e **BACK** para sair:
 
-| Layout e brilho | Tom da carta e orientacao | Gama do painel | Desenhos |
-| :---: | :---: | :---: | :---: |
-| <img src="docs/screenshots/settings.png" alt="Configuracoes pagina 1 com brilho, tempo para apagar a tela e previas dos layouts" width="200"> | <img src="docs/screenshots/settings-tone.png" alt="Configuracoes pagina 2 com tom da carta e orientacao da tela" width="200"> | <img src="docs/screenshots/settings-gamma.png" alt="Configuracoes pagina 3 com perfil de gama e escalas de cinza e RGB" width="200"> | <img src="docs/screenshots/settings-doodles.png" alt="Configuracoes pagina 4 com area do desenho, como comecar a desenhar e onde salvar" width="200"> |
+- **SETTINGS**, no menu principal, guarda o que vale para o aparelho todo: brilho, tempo para apagar, orientacao e gama (duas paginas). **BACK** volta ao menu principal.
+- **CARD OPTIONS**, no menu de tokens, guarda o que so afeta a carta do token: layout, tom da carta e desenhos (tres paginas). **BACK** volta para a carta.
 
-### Pagina 1: brilho, tempo e layout
+<img src="docs/screenshots/settings-gamma.png" alt="Pagina de gama da tela com perfil de gama e escalas de cinza e RGB" width="200"> <img src="docs/screenshots/settings-doodles.png" alt="Pagina de desenhos com area do desenho, como comecar a desenhar e onde salvar" width="200">
+
+*Capturadas antes da divisao das configuracoes; no aparelho os titulos agora sao `SETTINGS 2/2` e `CARD OPTIONS 3/3`.*
+
+### Pagina 1: brilho, tempo e tela
 
 - **BRIGHTNESS**: 10 niveis de brilho, de 10% a 100%. Use **-** / **+** ou toque nas barras para ir direto a um nivel.
 - **SCREEN OFF AFTER**: tempo sem toque ate apagar a tela: 15 s, 30 s, 1, 2, 5 ou 10 min, ou `Never` (o padrao). O toque que acorda a tela so a acende e nao aciona nenhum botao.
-- **LAYOUT**: toque numa das miniaturas.
-  - **Classic**: a carta com a barra de botoes embaixo e a engrenagem e a lupa nos cantos (o padrao).
-  - **Overlay**: a carta ocupa a tela inteira e os controles ficam sobre a arte: `<`, engrenagem, lupa e `>` no topo, botoes grandes **-** / **+** ao lado do numero e, embaixo dele, o seletor de modo (`QTY`, `TAP`, `POW`, `TGH`).
-  - **Card only**: como o Overlay, mas os controles somem depois de 4 s sem toque e sobra so a carta. O primeiro toque traz os controles de volta sem acionar nada.
-
-Nos layouts de tela cheia, tocar na arte ainda vira os tokens e tocar na barra do nome ainda abre a lista. **BACK** volta para a carta.
-
-### Pagina 2: tom da carta e orientacao
-
-Para quando a carta parece clara, lavada ou estourada, como com a placa deitada na mesa:
-
-- **CARD TONE**: escurece a carta inteira (arte, moldura, caixas de texto e o icone de mana) e abaixa o ponto branco, para que o branco nao estoure: `ORIGINAL` (o padrao) e `DARKER 1` a `DARKER 5`. A previa entre **-** e **+** e uma carta em miniatura do token atual com o tom escolhido (no `Custom`, uma escala de cinza). Vale para a carta e para as miniaturas de layout, mas nao para o resto da interface. Se o branco ainda incomodar, diminua tambem o **BRIGHTNESS** da pagina 1.
 - **SCREEN**: `NORMAL` ou `FLIPPED`, que gira a tela 180 graus (o touch acompanha). O painel TN fica bem melhor visto de um lado do que do outro; na mesa, teste as duas posicoes girando a placa.
 
-### Pagina 3: gama da tela
+### Pagina 2: gama da tela
 
 Para quando todas as cores parecem lavadas ou estouradas, nao so as claras:
 
@@ -244,7 +303,22 @@ Para quando todas as cores parecem lavadas ou estouradas, nao so as claras:
   - `ST7789 GAMMA`: as tabelas de gama do ST7789, que alguns paineis clones usam.
 - **TEST RAMPS**: degrades de cinza, vermelho, verde e azul, do preto ao pleno, direto do painel e sem o **CARD TONE**. Num painel bem ajustado cada degrau e diferente do vizinho e os primeiros sao escuros; se os degraus claros se confundem ou os escuros ja saem acinzentados, teste outro perfil. Depois de acertar a gama, ajuste o **CARD TONE** e o **BRIGHTNESS** se ainda for preciso.
 
-### Pagina 4: desenhos
+### Card options pagina 1: layout
+
+- **LAYOUT**: toque numa das miniaturas.
+  - **Classic**: a carta com a barra de botoes embaixo, o icone de menu no canto esquerdo e a lupa no direito (o padrao).
+  - **Overlay**: a carta ocupa a tela inteira e os controles ficam sobre a arte: `<`, icone de menu, lupa e `>` no topo, botoes grandes **-** / **+** ao lado do numero e, embaixo dele, o seletor de modo (`QTY`, `TAP`, `POW`, `TGH`).
+  - **Card only**: como o Overlay, mas os controles somem depois de 4 s sem toque e sobra so a carta. O primeiro toque traz os controles de volta sem acionar nada.
+
+Nos layouts de tela cheia, tocar na arte ainda vira os tokens e tocar na barra do nome ainda abre a lista.
+
+### Card options pagina 2: tom da carta
+
+Para quando a carta parece clara, lavada ou estourada, como com a placa deitada na mesa:
+
+- **CARD TONE**: escurece a carta inteira (arte, moldura, caixas de texto e o icone de mana) e abaixa o ponto branco, para que o branco nao estoure: `ORIGINAL` (o padrao) e `DARKER 1` a `DARKER 5`. A previa entre **-** e **+** e uma carta em miniatura do token atual com o tom escolhido (no `Custom`, uma escala de cinza). Vale para a carta e para as miniaturas de layout, mas nao para o resto da interface. Se o branco ainda incomodar, diminua tambem o **BRIGHTNESS** ou teste o **SCREEN** em **SETTINGS**.
+
+### Card options pagina 3: desenhos
 
 Veja [Modo de desenho](#modo-de-desenho).
 
@@ -291,6 +365,8 @@ Os tokens vem de `src/tokens_generated.h`, gerado a partir da API do Scryfall. N
 - Rin and Seri tem `Cat (Rin and Seri)` **verde 1/1** e `Dog (Rin and Seri)` **branco 1/1**. O Cat branco que ja existia continua separado. `Cragflame (Mabel)` e o token lendario de Equipment.
 - Emblemas tambem entram quando disponiveis. Nao e uma lista de todas as artes alternativas, nem um motor que executa todas as habilidades de Magic.
 
+A mesma execucao grava `src/precons_generated.h`: nome, codigo do set, ano e tokens do catalogo de cada precon, usados na lista de precons (**DECKS → NEW**). Edicoes de colecionador reaproveitam a lista de tokens do deck normal. O `PRECON_CATALOG_ID` precisa ser igual ao `CATALOG_ID`, entao a compilacao falha se so um dos dois arquivos for atualizado.
+
 ### Regenerar o catalogo e as artes
 
 Execute na raiz do projeto. Precisa de internet; as imagens precisam do Pillow. Estes comandos usam o Python do PlatformIO no Prompt de Comando do Windows:
@@ -306,7 +382,7 @@ Em outras plataformas, use `python -m pip install pillow` e `python tools/fetch_
 | --- | --- |
 | `--as-of YYYY-MM-DD` | Limitar a data de lancamento dos precons; o padrao e hoje. A snapshot incluida usa `2026-10-24` |
 | `--refresh` | Atualizar as respostas de API em cache |
-| `--no-art` | Gerar apenas o catalogo |
+| `--no-art` | Gerar apenas o catalogo e os decks de precon |
 | `--no-sd-art` | Gerar catalogo e arte embutida, sem a pasta do microSD |
 
 Os dados de API ficam em `tools/catalog_cache`; as imagens baixadas sao reutilizadas de `tools/art_cache`. Sem Pillow, so o catalogo e gerado. O gerador percorre todas as paginas e falha explicitamente se nao conseguir resolver uma entrada obrigatoria. A qualidade JPEG so e reduzida para a arte embutida caber na flash; no SD continua em 90. As curvas de cor/tom e o gamma do painel nao mudam. Recompile e grave depois de regenerar a arte embutida; se o catalogo mudou, substitua tambem a pasta do SD.
@@ -321,6 +397,17 @@ Para adicionar um token, acrescente uma tupla em `SPECS` no formato `(nome, core
 - `rotulo`: nome exibido na lista quando dois tokens teriam o mesmo nome, como `Wurm (Deathtouch)` e `Wurm (Lifelink)`.
 
 ### Testes offline
+
+As regras de mesa podem ser testadas no PC com um compilador C++11 nativo (nao o compilador cruzado do ESP32). Por exemplo, com GCC no Prompt de Comando do Windows:
+
+```bat
+g++ -std=c++11 -Wall -Wextra -Werror tools\test_table_state.cpp -o "%TEMP%\test_table_state.exe"
+"%TEMP%\test_table_state.exe"
+```
+
+Os testes cobrem inclusao de tokens e navegacao circular dos decks, os oito jogadores e seus dois comandantes, ajustes e limites de vida, o limite de 21 por comandante, validacao do formato salvo e faixas/rejeicao dos dados.
+
+Testes do gerador do catalogo:
 
 ```bat
 "%USERPROFILE%\.platformio\penv\Scripts\python.exe" -m unittest tools.test_fetch_tokens
@@ -351,6 +438,8 @@ Resultado da snapshot de 2026-10-24:
 O arquivo gerado inclui um `CATALOG_ID` e os CRCs dos prefixos da lista. Se a expansao mantiver todas as entradas antigas na mesma ordem, quantidades, selecao, contadores, nomes e cartas externas sao preservados. Catalogos incompativeis descartam apenas o estado dos tokens, com aviso no serial; `Custom` e configuracoes continuam preservados.
 
 `partitions.csv` mantem os offsets da aplicacao e da NVS antiga e reserva uma NVS `tokenstore` de 128 KiB para o catalogo ampliado. O firmware migra os saves antigos automaticamente, sem apagar a NVS original. Grave normalmente com PlatformIO para atualizar tambem a tabela de particoes; nao use `erase_flash` para esta atualizacao.
+
+As ferramentas de mesa usam um namespace `table` separado na `tokenstore`, sem mudar o formato dos saves de tokens. Os filtros dos decks sobrevivem a expansoes compativeis do catalogo. Se a ordem dos tokens mudar de forma incompativel, os nomes dos decks continuam, mas as listas sao limpas com aviso para nao apontar para tokens errados.
 
 Com **SAVE DOODLES TO** em `FLASH`, os desenhos salvos sao arquivos LittleFS separados na particao `spiffs` ja existente, nao fazem parte da NVS dos tokens. A gravacao normal do firmware preserva essa particao; `uploadfs`, a inicializacao explicita do armazenamento de desenhos ou apagar toda a flash nao preservam. Com `SD CARD`, sao arquivos em `/doodles` no microSD, nomeados pelo ID do prefixo do catalogo e pela posicao (`dXXXXXXXX-NNNN.bin`).
 

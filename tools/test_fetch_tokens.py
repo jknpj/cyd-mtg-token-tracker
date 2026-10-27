@@ -120,18 +120,42 @@ class TokenCatalogTests(unittest.TestCase):
                 return {"data": decks}
             if url.endswith("/sets"):
                 return {"data": sets}
-            return {"data": {"mainBoard": [{"name": "Creator", "identifiers": {"scryfallId": url}}]}}
+            return {"data": {"mainBoard": [{"name": "Creator", "identifiers": {
+                "scryfallId": "creator" if url.endswith("/New.json") else url}}]}}
 
-        creator = {"all_parts": [{"component": "token", "id": "linked"},
-                                 {"component": "combo_piece", "id": "not-token"}]}
+        creator = {"id": "creator", "all_parts": [{"component": "token", "id": "linked"},
+                                                  {"component": "combo_piece", "id": "not-token"}]}
         with patch.object(tokens, "read_json", side_effect=read), patch.object(tokens, "search", return_value=[face()]):
-            with patch.object(tokens, "collection", side_effect=[[creator], [face("Dog")]]) as collect:
-                result, count, codes = tokens.commander_tokens("2026-10-24")
+            with patch.object(tokens, "collection", side_effect=[[creator], [{**face("Dog"), "id": "linked"}]]) as collect:
+                result, count, codes, precons = tokens.commander_tokens("2026-10-24")
         self.assertEqual(count, 2)
         self.assertEqual(codes, ["tblc"])
         self.assertEqual({item["name"] for item in result}, {"Cat", "Dog"})
         self.assertEqual(len(collect.call_args_list[0].args[0]), 2)
         self.assertEqual(collect.call_args_list[1].args[0], {"linked"})
+        self.assertEqual([(deck["code"], deck["date"]) for deck in precons], [("CMD", "2011-06-17"), ("BLC", "2024-08-02")])
+        self.assertEqual(precons[0]["keys"], set())
+        self.assertEqual(precons[1]["keys"], {tokens.face_key(face("Dog"))})
+
+    def test_precons_map_tokens_to_firmware_indexes_newest_first(self):
+        cat, dog = face(), face("Dog")
+        precons = [{"name": "Old", "code": "CMD", "date": "2011-06-17", "keys": {tokens.face_key(dog)}},
+                   {"name": "New", "code": "BLC", "date": "2024-08-02",
+                    "keys": {tokens.face_key(dog), tokens.face_key({**cat, "artist": "Other"})}},
+                   {"name": "Empty", "code": "BLC", "date": "2024-08-02", "keys": set()},
+                   {"name": "Old Collector's Edition", "code": "CMD", "date": "2011-06-17", "keys": {tokens.face_key(dog)}}]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "precons.h"
+            with patch.object(tokens, "PRECON_OUTPUT", output):
+                tokens.write_precons(precons, [("Cat", cat), ("Dog", dog)], 0x1234, "2026-10-24")
+                text = output.read_text()
+                self.assertIn("PRECON_CATALOG_ID = 0x00001234u", text)
+                self.assertIn("PRECON_TOKENS[3] = {\n    1, 2, 2,\n};", text)
+                self.assertLess(text.index('{"Empty", "BLC", 2024, 0, 0}'), text.index('{"New", "BLC", 2024, 0, 2}'))
+                self.assertLess(text.index('{"New"'), text.index('{"Old", "CMD", 2011, 2, 1}'))
+                self.assertIn('{"Old Collector\'s Edition", "CMD", 2011, 2, 1}', text)
+                with self.assertRaisesRegex(RuntimeError, "missing from the catalog"):
+                    tokens.write_precons(precons, [("Cat", cat)], 0x1234, "2026-10-24")
 
     def test_generation_preserves_prefix_and_symbols_and_deduplicates(self):
         cat = face()
@@ -140,10 +164,14 @@ class TokenCatalogTests(unittest.TestCase):
             output = Path(directory) / "catalog.h"
             with patch.object(tokens, "OUTPUT", output), patch.object(tokens, "SPECS", [("Cat", "w", 1, 1, "")]):
                 with patch.object(tokens, "fetch", return_value=(cat, "")), patch.object(tokens, "drop_stale_art"):
-                    with patch.object(tokens, "commander_tokens", return_value=([cat, shark, shark], 198, ["tblc"])):
+                    precons = [{"name": "Deck", "code": "BLC", "date": "2024-08-02", "keys": {tokens.face_key(shark)}}]
+                    with patch.object(tokens, "commander_tokens", return_value=([cat, shark, shark], 198, ["tblc"], precons)), \
+                            patch.object(tokens, "PRECON_OUTPUT", Path(directory) / "precons.h"):
                         with patch("sys.argv", ["fetch_tokens.py", "--no-art", "--as-of", "2026-10-24"]):
                             tokens.main()
             text = output.read_text()
+            self.assertIn('{"Deck", "BLC", 2024, 0, 1}', (Path(directory) / "precons.h").read_text())
+            self.assertIn("    2,\n", (Path(directory) / "precons.h").read_text())
         prefix = [("Cat", "Creature - Cat", "", True, 1, 1, "Color::White")]
         expected = zlib.crc32(json.dumps(prefix).encode()) & 0xFFFFFFFF
         self.assertIn(f"0x{expected:08X}u", text)

@@ -4,101 +4,123 @@
 
 **Tokens, pontos de vida, dano de comandante e dados para a sua mesa de Magic, tudo em uma tela touch de 2,8 polegadas. Sem celular, Wi-Fi ou conta durante a partida.**
 
-Um companheiro de mesa offline de Magic: The Gathering para o **CYD ESP32-2432S028R** (antigo *CYD MTG Token Tracker*). Comecou como um painel de tokens e agora cuida da mesa inteira: monte decks de tokens ou importe qualquer um dos 198 precons de Commander, acompanhe vida e dano de comandantes parceiros para ate oito jogadores e jogue dados e moedas em 3D. Tudo fica salvo entre as partidas.
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Menu principal com Tokens, Life Counter, Dice / Coin e Settings" width="200">
+  <img src="docs/screenshots/layout-classic.png" alt="Carta do token Soldier: cinco em jogo, um virado, com marcadores Shield e Flying" width="200">
+  <img src="docs/screenshots/life-counter.png" alt="Contador de vida para quatro jogadores com paineis coloridos virados para cada lugar" width="200">
+  <img src="docs/screenshots/dice.png" alt="Tres dados de vinte lados em 3D somando 13" width="200">
+</p>
 
-| Em resumo | |
-| --- | --- |
-| **Painel de tokens** | 455 entradas + Custom, cobrindo 198 listas de precons de Commander na snapshot de 24/10/2026; quantidades, copias viradas, marcadores e P/T |
-| **Decks e precons** | Oito decks de tokens com nome, com importacao de qualquer um dos 198 precons de Commander com um toque |
-| **Contador de vida** | Paineis grandes de toque para ate oito jogadores, com dano de comandantes parceiros, sorteio de "quem comeca?" e salvamento opcional da partida |
-| **Dados e moedas em 3D** | d4 a d20 e moedas, de 1 a 20 por vez, lancados com um giro 3D sombreado que para no resultado |
-| **Tres layouts de carta** | Controles no Classic, Overlay em tela cheia ou Card only sem controles sobre a carta |
-| **Desenhe nos tokens** | Desenho na arte ou na carta inteira: oito cores, tres pinceis, borracha, desfazer e salvamento na RAM, flash ou microSD |
-| **Busca rapida** | Nome, tipo, texto, cor e P/T pelo teclado na tela |
-| **Arte opcional no microSD** | JPEGs de maior qualidade, com retorno automatico para a arte embutida |
-| **Estado persistente** | Quantidades, marcadores, decks, token personalizado e preferencias de tela salvos na flash |
+Um companheiro de mesa offline de Magic: The Gathering para a placa barata **CYD ESP32-2432S028R** ("Cheap Yellow Display"), antigo *CYD MTG Token Tracker*. Grave uma vez e deixe na mesa:
 
-[Tour da interface](#tour-da-interface) · [Inicio rapido](#inicio-rapido) · [Controles](#controles) · [Mesa](#ferramentas-de-mesa) · [Desenhos](#modo-de-desenho) · [microSD](#arte-em-alta-qualidade-no-microsd) · [Configuracoes](#configuracoes) · [Catalogo e desenvolvimento](#catalogo-de-tokens)
+- **Painel de tokens**: 455 tokens de todos os precons de Commander, mais o seu token personalizado. Acompanhe quantos estao em jogo, quantos estao virados, marcadores e poder/resistencia.
+- **Decks e precons**: importe os tokens de qualquer um dos **198 precons de Commander** com um toque, ou monte ate oito decks seus.
+- **Contador de vida**: paineis grandes e coloridos para **1 a 8 jogadores**, cada um virado para o seu lugar, com dano de comandante (parceiros inclusos) e sorteio de "quem comeca?".
+- **Dados e moedas em 3D**: d4 a d20 e moedas, ate 20 por vez, com um lancamento 3D girando.
+- **Desenhos**: desenhe bigodes (ou o que quiser) nos seus tokens.
+- **Tudo fica salvo** entre as sessoes: tokens, marcadores, decks, configuracoes e, se quiser, a partida em andamento.
 
-## Tour da interface
+[Capturas de tela](#capturas-de-tela) · [Primeiros passos](#primeiros-passos) · [Como jogar](#como-jogar) · [Tokens](#controles) · [Vida](#vida-e-dano-de-comandante) · [Dados](#dados-e-moeda) · [Configuracoes](#configuracoes) · [Problemas](#solucao-de-problemas) · [Para desenvolvedores](#catalogo-de-tokens)
 
-| Classic | Overlay | Card only |
+## Capturas de tela
+
+*Capturadas de um CYD real com `tools/screenshot.py`. A arte oficial dos tokens nao e distribuida com o projeto, entao as cartas aqui mostram a area lisa no lugar dela; com a [arte](#arte), a ilustracao aparece nesse espaco. A interface da placa e em ingles.*
+
+**Tokens**
+
+| Carta do token | Escolher um token | Busca |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/layout-classic.png" alt="Layout Classic com tres tokens personalizados, marcadores e barra inferior de controles" width="240"> | <img src="docs/screenshots/layout-overlay.png" alt="Layout Overlay com controles de quantidade sobre a carta" width="240"> | <img src="docs/screenshots/layout-card-only.png" alt="Layout Card only depois que os controles desaparecem" width="240"> |
-| Barra de controles embaixo | Carta em tela cheia com controles | Controles somem depois de 4 segundos |
+| <img src="docs/screenshots/layout-classic.png" alt="Layout Classic: Soldier com cinco em jogo, um virado, marcadores Shield e Flying e barra de controles embaixo" width="200"> | <img src="docs/screenshots/token-list.png" alt="Lista de tokens, pagina 1 de 51, com Soldier selecionado e cinco em jogo" width="200"> | <img src="docs/screenshots/search-results.png" alt="Resultados da busca white flying: Spirit, Angel, Bird, Pegasus e outros" width="200"> |
+| Quantidade, copias viradas, marcadores | 455 tokens, pagina por pagina | Digite `white flying` e veja os voadores |
 
-| Contadores | Busca | Editor de token |
+| Marcadores | Menu de tokens | Desenhos |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/counters.png" alt="Tela de contadores com marcadores +1/+1, Shield e Flying" width="240"> | <img src="docs/screenshots/search.png" alt="Teclado de busca com a consulta green 3/3 e dez resultados" width="240"> | <img src="docs/screenshots/editor.png" alt="Editor com nome, tipo, cor, poder, resistencia e texto do token personalizado" width="240"> |
-| Marcadores por tipo de token | Combine cor, P/T e texto | Crie seu proprio token |
+| <img src="docs/screenshots/counters.png" alt="Pagina de marcadores com +1/+1 em 2, Shield 1 e Flying 1" width="200"> | <img src="docs/screenshots/token-menu.png" alt="Menu de tokens: Choose token, Decks / Precons, Card options, Main menu, Close" width="200"> | <img src="docs/screenshots/drawing.png" alt="Token Bird com carinha sorridente, bigode vermelho e coroa amarela desenhados a mao" width="200"> |
+| +1/+1, Shield, habilidades e mais | Tudo sobre tokens em um lugar | Desenhe em qualquer token |
 
-*Interface real do firmware renderizada pelo harness de testes no PC, nao fotos da tela fisica. As capturas usam um token personalizado sem arte de carta; as ilustracoes baixadas nao fazem parte do repositorio. Gama e efeitos do angulo de visao so aparecem no hardware. A interface da placa e em ingles nas duas versoes do README.*
+**Decks**
 
-## Inicio rapido
+| Seus decks | Precons de Commander |
+| :---: | :---: |
+| <img src="docs/screenshots/decks.png" alt="Tela de decks com o deck importado Calling All Angels ativo" width="200"> | <img src="docs/screenshots/precons.png" alt="Lista de precons, pagina 1 de 22, mais novos primeiro, com codigo da colecao, ano e quantidade de tokens" width="200"> |
+| Oito decks mais All tokens | Um toque importa os tokens do precon |
 
-### 1. Confira a placa
+**Vida, dados e moedas**
 
-Voce precisa de um **CYD ESP32-2432S028R**, com tela **ILI9341** e touch resistivo **XPT2046**, um cabo USB de dados e o [PlatformIO](https://platformio.org/install/ide?install=vscode) no VS Code. O microSD e opcional.
+| Contador de vida | Dano de comandante | Menu da vida |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/life-counter.png" alt="Quatro jogadores no meio da partida, com o jogador 2 marcado FIRST" width="200"> | <img src="docs/screenshots/commander-damage.png" alt="Registrando dano de comandante no jogador 3: o jogador 1 causou 7" width="200"> | <img src="docs/screenshots/life-menu.png" alt="Menu da vida: Dice / Coin, Who starts?, New game, Save match, Main menu, Close" width="200"> |
+| Metade esquerda -1, direita +1 | Dano de cada comandante | Quem comeca, nova partida e mais |
 
-> **Confira a revisao da placa antes de gravar.** Outras variantes do CYD podem usar outro controlador de tela ou outra pinagem.
+| Dados | Moedas |
+| :---: | :---: |
+| <img src="docs/screenshots/dice.png" alt="Tres d20 rolados somando 13" width="200"> | <img src="docs/screenshots/coins.png" alt="Tres moedas: uma cara dourada e duas coroas prateadas" width="200"> |
+| d4 a d20, ate 20 de uma vez | Caras e coroas contadas para voce |
 
-### 2. Compile e grave
+**Visual e configuracoes**
 
-Abra a pasta do projeto no VS Code. Use **PlatformIO: Build** e depois **PlatformIO: Upload**, ou execute estes comandos na raiz do projeto:
+| Layout Overlay | Layout Card only | Card options |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/layout-overlay.png" alt="Layout Overlay com botoes grandes de menos e mais sobre a arte" width="200"> | <img src="docs/screenshots/layout-card-only.png" alt="Layout Card only com os controles escondidos" width="200"> | <img src="docs/screenshots/card-options.png" alt="Card options pagina 1: miniaturas dos layouts Classic, Overlay e Card only" width="200"> |
+| Botoes maiores sobre a arte | So a carta, controles somem | Escolha o layout |
+
+## Primeiros passos
+
+### Do que voce precisa
+
+- Uma placa **CYD ESP32-2432S028R** (a de tela **ILI9341** de 2,8 polegadas com touch **XPT2046**). Outras variantes do CYD podem usar outra tela ou outros pinos.
+- Um cabo USB **de dados** (alguns cabos so carregam).
+- Um computador com [VS Code e PlatformIO](https://platformio.org/install/ide?install=vscode).
+- Opcional: um cartao microSD, para arte mais nitida ou para salvar desenhos.
+
+### Grave o firmware
+
+1. Baixe ou clone este repositorio e abra a pasta no VS Code.
+2. Conecte a placa. Se ela nao estiver na **COM7**, troque `upload_port` e `monitor_port` no [platformio.ini](platformio.ini) pela porta da sua placa.
+3. Clique em **PlatformIO: Upload** (a seta na barra de status embaixo). A primeira compilacao leva alguns minutos.
+
+Pronto: a placa reinicia no menu principal. Prefere a linha de comando? Na pasta do projeto:
 
 ```console
-pio run -e esp32dev
 pio run -e esp32dev -t upload
-pio device monitor -b 115200
 ```
 
-No **Prompt de Comando do Windows**, se `pio` nao estiver no PATH:
+No **Prompt de Comando** do Windows, se `pio` nao estiver no PATH:
 
 ```bat
-"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e esp32dev -t upload -t monitor
+"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e esp32dev -t upload
 ```
 
-O [platformio.ini](platformio.ini) configura as duas portas USB como **COM7**. Ajuste `upload_port` e `monitor_port` para a porta da sua placa, se necessario. Saia do monitor serial com **Ctrl+C** antes de gravar de novo.
-
-> **Primeira compilacao:** o catalogo ja vem incluido, mas as artes nao. Voce pode gravar agora e usar fundos coloridos ou [gerar as artes](#regenerar-o-catalogo-e-as-artes) antes de compilar.
+> **A arte dos tokens e opcional.** O repositorio nao inclui arte oficial das cartas. Sem ela, os tokens mostram uma area colorida lisa; para ter as ilustracoes, [gere a arte](#regenerar-o-catalogo-e-as-artes) antes de compilar ou [copie-a para um microSD](#arte-em-alta-qualidade-no-microsd).
 >
-> **Atualizacao de uma placa em uso:** grave normalmente para preservar os saves. Nao execute `erase_flash`. O projeto usa [partitions.csv](partitions.csv), com uma particao dedicada aos saves dos tokens.
+> **Atualizando?** E so gravar de novo: tokens, decks e configuracoes sao mantidos. Nao use `erase_flash`.
 
-### 3. Comece a jogar
+## Como jogar
 
-O aparelho inicia no **MAIN MENU**: **TOKENS**, **LIFE COUNTER**, **DICE / COIN** ou **SETTINGS** (so a tela). Cada modo tem seu proprio menu, e o **MAIN MENU** dele volta para ca. Trocar de modo nao zera os tokens nem a partida atual.
+A placa comeca no **MAIN MENU**. Escolha um modo; voce pode trocar a qualquer momento sem perder os tokens nem a partida atual. **BACK** sempre volta um passo, e **MAIN MENU** no menu de cada modo leva de volta ao inicio.
 
-1. Toque no **nome** da carta para escolher um token ou use a **lupa** para buscar.
-2. Use **+ / -** para mudar a quantidade; o botao central alterna entre `QTY`, `TAP`, `POW` e `TGH`.
-3. Toque na **arte** para virar ou desvirar o grupo.
-4. Toque na **caixa de texto** para adicionar marcadores. No `Custom`, use a faixa inferior; a caixa de texto abre o editor.
-5. Toque no **icone de menu** para abrir o menu de tokens: decks e precons, opcoes da carta (layout, tom, desenhos) ou voltar ao menu principal. As mudancas sao salvas automaticamente.
+**Tokens**
 
-```mermaid
-flowchart TD
-  Home[MAIN MENU] --> Card[Carta do token]
-  Home --> Life[Contador de vida]
-  Home --> Dice[Dados / moeda]
-  Home --> Settings[Settings: brilho, desligamento, orientacao, gamma]
-  Card -- icone de menu --> TokenMenu{{Menu de tokens}}
-  TokenMenu --> Picker[Lista de tokens]
-  TokenMenu --> Decks[Decks]
-  TokenMenu --> CardOptions[Card options: layout, tom, desenhos]
-  TokenMenu --> Home
-  Card -- barra do nome --> Picker
-  Card -- caixa de texto --> Counters[Contadores]
-  Card -- segurar arte / DRAW --> Drawing[Desenho]
-  Picker -- DECKS --> Decks
-  Decks -- NEW --> Precons[Lista de precons]
-  Precons -- EMPTY --> Name[Nomear deck vazio]
-  Decks -- EDIT --> Picker
-  Life -- botao redondo --> LifeMenu{{Menu da vida}}
-  LifeMenu --> Dice
-  LifeMenu --> NewGame[Nova partida]
-  LifeMenu --> Home
-```
+1. Toque em **TOKENS**. Toque no **nome** da carta para escolher um token (ou na **lupa** para buscar).
+2. Use **+** e **-** para mudar quantos estao em jogo. O botao do meio alterna entre quantidade (`QTY`), copias viradas (`TAP`) e bonus de poder/resistencia (`POW`, `TGH`).
+3. Toque na **arte** para virar ou desvirar todos.
+4. Toque no **texto de regras** para adicionar marcadores como +1/+1, Shield ou Flying.
+5. Toque no **icone de menu** para decks, precons, opcoes da carta e o menu principal.
 
-Todo **BACK** volta um passo: settings para o menu principal; card options, decks, a lista e os contadores para a carta; precons para os decks; e os dados para onde foram abertos.
+**Jogando com um precon?** Icone de menu → **DECKS / PRECONS** → **NEW** e toque no seu precon. A carta passa a mostrar so os tokens daquele deck.
+
+**Vida**
+
+1. Toque em **LIFE COUNTER**. Coloque todos em volta da placa: cada painel fica virado para o seu jogador.
+2. Toque na **metade esquerda** de um painel para **-1** e na **metade direita** para **+1**; segure para ir mais rapido.
+3. Toque na **faixa com o nome** de um jogador para registrar dano de comandante causado a ele.
+4. O botao redondo no meio abre **WHO STARTS?**, **NEW GAME** (jogadores e vida inicial), dados e mais.
+
+**Dados e moedas**
+
+Toque em **DICE / COIN** no menu principal ou no menu da vida, escolha o dado e quantos, e toque em **ROLL**.
+
+**Tela desbotada?** **SETTINGS** no menu principal tem brilho, desligamento da tela, orientacao e gama. O visual da carta (layout, tom, desenhos) fica em **CARD OPTIONS**, no menu de tokens.
 
 ## Hardware
 
@@ -125,6 +147,8 @@ Os grupos de icones desvirado/virado permanecem visiveis em todos os modos enqua
 
 O primeiro item da lista, `Custom`, e um token editavel: com ele selecionado, toque na parte de baixo da carta (tipo e texto) para abrir o editor de nome, linha de tipo, texto, cor e P/T. Os campos de texto usam um teclado na tela, e **SAVE** grava o token na flash.
 
+<img src="docs/screenshots/editor.png" alt="Editor do token personalizado com nome, tipo, texto, cor e poder/resistencia" width="200">
+
 O P/T exibido ja soma os marcadores e os modificadores. Tokens sem P/T (artefatos) editam apenas quantidade e tapped.
 
 Tokens com P/T variavel preservam os simbolos impressos (`*/*`, `*/1+*` etc.), em vez de fingir que sao 0/0. Seus modificadores aparecem junto do simbolo; o painel de tokens nao conhece cemiterios e nao le os totais do contador de vida para resolver essas habilidades sozinho. Cragflame e um Equipment: seu texto aparece na carta, mas equipar e aplicar seu bonus a outra criatura continuam sendo acoes manuais.
@@ -133,7 +157,7 @@ Tokens com P/T variavel preservam os simbolos impressos (`*/*`, `*/1+*` etc.), e
 
 Bigodes sao bem-vindos. **Segure a arte por cerca de um segundo**, ou abra os **Contadores** e toque em **DRAW**, para decorar o token selecionado. A pagina 3 do **CARD OPTIONS** escolhe [como o desenho comeca, onde a tinta vai e onde ela e salva](#card-options-pagina-3-desenhos).
 
-<img src="docs/screenshots/drawing.png" alt="Modo de desenho com rosto e bigode desenhados sobre um token personalizado e botoes Back, Pen, Undo, Clear e Save" width="240"> <img src="docs/screenshots/drawing-palette.png" alt="Pop-up do PEN sobre o desenho com oito cores, tres pinceis e a borracha" width="240">
+<img src="docs/screenshots/drawing.png" alt="Modo de desenho com rosto, bigode e coroa desenhados sobre um token Bird e botoes Back, Pen, Undo, Clear e Save" width="240"> <img src="docs/screenshots/drawing-palette.png" alt="Pop-up do PEN sobre o desenho com oito cores, tres pinceis e a borracha" width="240">
 
 A carta inteira cabe acima de uma barra separada, permitindo desenhar sem encostar nos controles do jogo. Com **DOODLE AREA** em `WHOLE CARD` (o padrao) da para desenhar na arte, nome, moldura e texto; com `ART ONLY`, a tinta fica so na arte e o que ja foi desenhado fora dela fica oculto (nao apagado) ate voltar a opcao. Durante o desenho, os indicadores de quantidade e virados ficam ocultos; os valores do jogo nao mudam. Fora desse modo, o desenho continua visivel nos tres layouts e os toques normais continuam funcionando.
 
@@ -165,7 +189,7 @@ Os desenhos usam tracos compactos, nao bitmaps de tela inteira. Cada token aceit
 
 O desenho e reprojetado entre os layouts, mantendo os tracos da arte ancorados na arte; as proporcoes do texto e da moldura podem variar um pouco. Expansoes compativeis que apenas acrescentam entradas ao catalogo preservam os desenhos salvos. Prefixos de catalogo alterados ou reordenados nao reutilizam desenhos em outro token. Evite `uploadfs`, que substituiria o sistema de arquivos dos desenhos.
 
-*Desenho e persistencia sao cobertos pelo harness no PC; a sensacao do touch resistivo, as gravacoes na flash e no microSD e a latencia ainda precisam de teste no CYD fisico. Uma caneta deve facilitar os detalhes pequenos.*
+*Dica: o touch resistivo funciona com a unha, mas uma caneta facilita muito os detalhes pequenos.*
 
 ## Contadores
 
@@ -234,7 +258,7 @@ O gerador tambem grava a arte de todos os tokens em **JPEG qualidade 90, cor 4:4
 
 **O cartao nao e obrigatorio.** Se uma imagem do SD nao puder ser aberta, o firmware usa a arte embutida ou, se ela tambem nao existir, um fundo colorido. Os arquivos gerados em `sdcard/` ficam fora do controle de versao. Use `--no-sd-art` para nao gera-los.
 
-*A leitura do SD foi exercitada no harness do PC e o firmware compila. O funcionamento com microSD fisico ainda precisa ser validado no CYD.*
+*A leitura de arte do microSD so foi testada fora da placa ate agora; abra uma issue se nao funcionar na sua.*
 
 Quantidades, marcadores, modificadores e o token selecionado ficam salvos na flash (NVS) e sao restaurados ao religar a placa.
 
@@ -283,9 +307,9 @@ Ha duas telas de configuracao, cada uma com **<** / **>** para trocar de pagina 
 - **SETTINGS**, no menu principal, guarda o que vale para o aparelho todo: brilho, tempo para apagar, orientacao e gama (duas paginas). **BACK** volta ao menu principal.
 - **CARD OPTIONS**, no menu de tokens, guarda o que so afeta a carta do token: layout, tom da carta e desenhos (tres paginas). **BACK** volta para a carta.
 
-<img src="docs/screenshots/settings-gamma.png" alt="Pagina de gama da tela com perfil de gama e escalas de cinza e RGB" width="200"> <img src="docs/screenshots/settings-doodles.png" alt="Pagina de desenhos com area do desenho, como comecar a desenhar e onde salvar" width="200">
-
-*Capturadas antes da divisao das configuracoes; no aparelho os titulos agora sao `SETTINGS 2/2` e `CARD OPTIONS 3/3`.*
+| Settings 1/2 | Settings 2/2 | Card options 2/3 | Card options 3/3 |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/settings.png" alt="Settings pagina 1: barras de brilho, desligamento da tela e orientacao" width="170"> | <img src="docs/screenshots/settings-gamma.png" alt="Settings pagina 2: perfil de gama com escalas de cinza e RGB" width="170"> | <img src="docs/screenshots/card-tone.png" alt="Card options pagina 2: tom da carta com miniatura de previa" width="170"> | <img src="docs/screenshots/card-doodles.png" alt="Card options pagina 3: area do desenho, como comecar a desenhar e onde salvar" width="170"> |
 
 ### Pagina 1: brilho, tempo e tela
 
@@ -336,6 +360,8 @@ A lupa ou o botao **FIND** da lista de tokens abre um teclado na tela. Digite e 
 - Com varias palavras separadas por espaco, todas precisam combinar, em qualquer ordem (`green 3/3` acha os tokens verdes 3/3).
 - Cada palavra e procurada no nome, na linha de tipo, no texto, no nome da cor (`white`, `blue`, `black`, `red`, `green`, `multicolor`, `colorless`) e no P/T (`3/3`).
 - **FIND** na lista refina a busca mantendo o texto digitado; **BACK** no teclado cancela. Tocar na barra do nome na carta sempre abre a lista completa, e **<** / **>** na carta continuam passando por todos os tokens.
+
+<img src="docs/screenshots/search.png" alt="Teclado de busca com white flying digitado e 20 resultados" width="200"> <img src="docs/screenshots/search-results.png" alt="Lista de resultados da busca white flying" width="200">
 
 ## Solucao de problemas
 
@@ -432,6 +458,18 @@ Resultado da snapshot de 2026-10-24:
 - Designacoes de jogo (Dungeon, Monarch/Initiative, Ring, Boss, Event, contadores de Experience/Poison) nao viram tokens, porque nao sao permanentes.
 
 </details>
+
+### Atualizar as capturas de tela
+
+As imagens em `docs/screenshots` sao capturadas de uma placa real. O build `shots` adiciona comandos seriais que copiam a tela e simulam toques, e deixa de fora a arte embutida:
+
+```bat
+"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e shots -t upload
+"%USERPROFILE%\.platformio\penv\Scripts\python.exe" tools\screenshot.py COM7 shot home tap 120 102 wait 800 shot token-card
+"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e esp32dev -t upload
+```
+
+Os passos sao `tap X Y`, `hold X Y MS`, `path X,Y X,Y ... end` (arrastar), `wait MS` e `shot NOME` (salva `docs/screenshots/NOME.png`). As coordenadas sao pixels da tela em retrato (240x320). A captura le a memoria do display, entao os PNGs saem com as cores certas mesmo com a inversao de cores deste painel. Grave o `esp32dev` de novo no final; o build `shots` e so para desenvolvimento.
 
 ## Saves e atualizacoes do firmware
 

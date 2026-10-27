@@ -4,101 +4,123 @@
 
 **Tokens, life totals, commander damage, and dice for your Magic table, all on a 2.8-inch touchscreen. No phone, Wi-Fi, or account needed during play.**
 
-An offline Magic: The Gathering table companion for the **CYD ESP32-2432S028R** (formerly *CYD MTG Token Tracker*). It started as a token board and now runs the whole table: build token decks or import any of 198 Commander precons, track life and partner-commander damage for up to eight players, and toss 3D dice and coins. Everything is saved between sessions.
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Main menu with Tokens, Life Counter, Dice / Coin, and Settings" width="200">
+  <img src="docs/screenshots/layout-classic.png" alt="Soldier token card: five in play, one tapped, with Shield and Flying counters" width="200">
+  <img src="docs/screenshots/life-counter.png" alt="Four-player life counter with colored panels facing each seat" width="200">
+  <img src="docs/screenshots/dice.png" alt="Three 3D twenty-sided dice showing 13 in total" width="200">
+</p>
 
-| At a glance | |
-| --- | --- |
-| **Token board** | 455 catalog entries + Custom, covering 198 Commander precon decklists in the 2026-10-24 snapshot; quantities, tapped copies, counters, and P/T |
-| **Decks and precons** | Eight named token decks, with one-tap import of any of 198 Commander precons |
-| **Life counter** | Big tap-to-change life panels for up to eight players, with partner-commander damage, a random "who starts?" pick, and optional match saving |
-| **3D dice and coins** | d4 to d20 and coins, 1-20 at a time, tossed with a shaded 3D tumble that lands on the result |
-| **Three card layouts** | Classic controls, full-screen Overlay, or an unobstructed Card only view |
-| **Doodle on your tokens** | Draw on the artwork or the whole card: eight colors, three brushes, an eraser, Undo, and saves to RAM, flash, or microSD |
-| **Fast lookup** | Search names, types, rules text, colors, and P/T with the on-screen keyboard |
-| **Optional microSD art** | Higher-quality JPEGs, with automatic fallback to embedded artwork |
-| **Persistent state** | Quantities, counters, decks, custom token, and display preferences saved in flash |
+An offline Magic: The Gathering table companion for the cheap **CYD ESP32-2432S028R** ("Cheap Yellow Display") board, formerly *CYD MTG Token Tracker*. Flash it once and leave it on the table:
 
-[UI tour](#ui-tour) · [Quick start](#quick-start) · [Controls](#controls) · [Table tools](#table-tools) · [Doodles](#doodle-mode) · [microSD](#high-quality-artwork-on-microsd) · [Settings](#settings) · [Catalog and development](#token-catalog)
+- **Token board**: 455 tokens from every Commander precon, plus your own custom token. Track how many are in play, how many are tapped, counters, and power/toughness.
+- **Decks and precons**: import the tokens of any of **198 Commander precons** with one tap, or build up to eight decks of your own.
+- **Life counter**: big, colorful panels for **1 to 8 players**, each facing its seat, with commander damage (partners included) and a random "who starts?" pick.
+- **3D dice and coins**: d4 to d20 and coins, up to 20 at a time, with a tumbling 3D toss.
+- **Doodles**: draw moustaches (or anything else) on your tokens.
+- **Everything is saved** between sessions: tokens, counters, decks, settings, and optionally the match in progress.
 
-## UI tour
+[Screenshots](#screenshots) · [Getting started](#getting-started) · [How to play](#how-to-play) · [Tokens](#controls) · [Life counter](#life-and-commander-damage) · [Dice](#dice-and-coins) · [Settings](#settings) · [Troubleshooting](#troubleshooting) · [For developers](#token-catalog)
 
-| Classic | Overlay | Card only |
+## Screenshots
+
+*Captured from a real CYD with `tools/screenshot.py`. Official token artwork is not distributed with this project, so the cards here show the plain placeholder; with [artwork](#artwork), the illustration appears in that space.*
+
+**Tokens**
+
+| Token card | Choose a token | Search |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/layout-classic.png" alt="Classic layout with three custom tokens, counters, and a bottom control bar" width="240"> | <img src="docs/screenshots/layout-overlay.png" alt="Overlay layout with quantity controls over the card" width="240"> | <img src="docs/screenshots/layout-card-only.png" alt="Card only layout after the controls have hidden" width="240"> |
-| Bottom control bar | Full-screen card with controls | Controls hide after 4 seconds |
+| <img src="docs/screenshots/layout-classic.png" alt="Classic layout: Soldier with five in play, one tapped, Shield and Flying pills, and a bottom control bar" width="200"> | <img src="docs/screenshots/token-list.png" alt="Token list, page 1 of 51, with Soldier selected and five in play" width="200"> | <img src="docs/screenshots/search-results.png" alt="Search results for white flying: Spirit, Angel, Bird, Pegasus, and more" width="200"> |
+| Quantity, tapped copies, counters | 455 tokens, page by page | Type `white flying`, get flyers |
 
-| Counters | Search | Custom token editor |
+| Counters | Token menu | Doodles |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/counters.png" alt="Counters page showing +1/+1, Shield, and Flying counters" width="240"> | <img src="docs/screenshots/search.png" alt="Search keyboard with the query green 3/3 and ten matches" width="240"> | <img src="docs/screenshots/editor.png" alt="Custom token editor with name, type, color, power, toughness, and rules fields" width="240"> |
-| Track counters per token type | Combine color, P/T, and text | Make your own token |
+| <img src="docs/screenshots/counters.png" alt="Counters page with +1/+1 at 2, Shield 1, and Flying 1" width="200"> | <img src="docs/screenshots/token-menu.png" alt="Token menu: Choose token, Decks / Precons, Card options, Main menu, Close" width="200"> | <img src="docs/screenshots/drawing.png" alt="Bird token with a hand-drawn smiley face, red moustache, and yellow crown" width="200"> |
+| +1/+1, Shield, keywords, and more | Everything about tokens in one place | Draw on any token |
 
-*Actual firmware UI rendered by the PC test harness, not photos of the physical display. These captures use a custom token without card artwork; downloaded token illustrations are not included in the repository. Display gamma and viewing-angle effects are only visible on hardware. The device UI is in English in both README versions.*
+**Decks**
 
-## Quick start
+| Your decks | Commander precons |
+| :---: | :---: |
+| <img src="docs/screenshots/decks.png" alt="Decks screen with the imported Calling All Angels deck active" width="200"> | <img src="docs/screenshots/precons.png" alt="Precon list, page 1 of 22, newest first, with set code, year, and token count" width="200"> |
+| Eight decks plus All tokens | One tap imports a precon's tokens |
 
-### 1. Check your board
+**Life, dice, and coins**
 
-You need a **CYD ESP32-2432S028R**, with an **ILI9341** display and **XPT2046** resistive touch controller, a USB data cable, and [PlatformIO](https://platformio.org/install/ide?install=vscode) in VS Code. A microSD card is optional.
+| Life counter | Commander damage | Life menu |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/life-counter.png" alt="Four players mid-game, with player 2 marked FIRST" width="200"> | <img src="docs/screenshots/commander-damage.png" alt="Recording commander damage dealt to player 3: player 1 has dealt 7" width="200"> | <img src="docs/screenshots/life-menu.png" alt="Life menu: Dice / Coin, Who starts?, New game, Save match, Main menu, Close" width="200"> |
+| Tap the left half for -1, right for +1 | Track damage from each commander | Who starts, new game, and more |
 
-> **Check the board revision before flashing.** Other CYD variants may use a different display controller or pinout.
+| Dice | Coins |
+| :---: | :---: |
+| <img src="docs/screenshots/dice.png" alt="Three d20s rolled for a total of 13" width="200"> | <img src="docs/screenshots/coins.png" alt="Three coins flipped: one gold heads and two silver tails" width="200"> |
+| d4 to d20, up to 20 at once | Heads and tails, counted for you |
 
-### 2. Build and upload
+**Looks and settings**
 
-Open the project folder in VS Code. Use **PlatformIO: Build**, then **PlatformIO: Upload**, or run these commands from the project root:
+| Overlay layout | Card only layout | Card options |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/layout-overlay.png" alt="Overlay layout with large minus and plus buttons over the artwork" width="200"> | <img src="docs/screenshots/layout-card-only.png" alt="Card only layout with controls hidden" width="200"> | <img src="docs/screenshots/card-options.png" alt="Card options page 1: Classic, Overlay, and Card only layout thumbnails" width="200"> |
+| Bigger buttons on the art | Just the card, controls hide | Pick your layout |
+
+## Getting started
+
+### What you need
+
+- A **CYD ESP32-2432S028R** board (the one with a 2.8-inch **ILI9341** screen and **XPT2046** touch). Other CYD variants may use a different screen or pins.
+- A USB **data** cable (some cables only charge).
+- A computer with [VS Code and PlatformIO](https://platformio.org/install/ide?install=vscode).
+- Optional: a microSD card, for sharper token artwork or for saving doodles.
+
+### Install the firmware
+
+1. Download or clone this repository and open the folder in VS Code.
+2. Plug in the board. If it is not on **COM7**, change `upload_port` and `monitor_port` in [platformio.ini](platformio.ini) to your board's port.
+3. Click **PlatformIO: Upload** (the arrow in the bottom status bar). The first build takes a few minutes.
+
+That's it: the board restarts into the main menu. Prefer the command line? From the project folder:
 
 ```console
-pio run -e esp32dev
 pio run -e esp32dev -t upload
-pio device monitor -b 115200
 ```
 
 On Windows **Command Prompt**, if `pio` is not on your PATH:
 
 ```bat
-"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e esp32dev -t upload -t monitor
+"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e esp32dev -t upload
 ```
 
-[platformio.ini](platformio.ini) currently sets both USB ports to **COM7**. Change `upload_port` and `monitor_port` to your board's port if needed. Exit the serial monitor with **Ctrl+C** before another upload.
-
-> **First build:** the catalog is included, but artwork is not. You can flash immediately and use colored placeholders, or [generate the artwork](#regenerating-the-catalog-and-artwork) before building.
+> **Token artwork is optional.** The repository does not include official card art. Without it, tokens show a plain colored area; to add the illustrations, [generate the artwork](#regenerating-the-catalog-and-artwork) before building or [copy it to a microSD card](#high-quality-artwork-on-microsd).
 >
-> **Updating an existing board:** upload normally to preserve saves. Do not run `erase_flash`. The project uses [partitions.csv](partitions.csv), including a dedicated token-save partition.
+> **Updating?** Just upload again: your tokens, decks, and settings are kept. Do not run `erase_flash`.
 
-### 3. Start playing
+## How to play
 
-The device starts at **MAIN MENU**: **TOKENS**, **LIFE COUNTER**, **DICE / COIN**, or **SETTINGS** (display only). Each mode has its own menu, and **MAIN MENU** in it comes back here. Switching modes does not reset tokens or the current match.
+The board starts at the **MAIN MENU**. Pick a mode; you can switch at any time without losing tokens or the current game. **BACK** always goes one step back, and **MAIN MENU** in each mode's menu brings you home.
 
-1. Tap the card's **name** to choose a token, or use the **magnifying glass** to search.
-2. Use **+ / -** to change quantity; the center button switches between `QTY`, `TAP`, `POW`, and `TGH`.
-3. Tap the **artwork** to tap or untap the group.
-4. Tap the **rules box** to add counters. On `Custom`, use the bottom strip instead; the rules box opens its editor.
-5. Tap the **menu icon** for the token menu: decks and precons, card options (layout, tone, doodles), or back to the main menu. Changes are saved automatically.
+**Tokens**
 
-```mermaid
-flowchart TD
-  Home[MAIN MENU] --> Card[Token card]
-  Home --> Life[Life counter]
-  Home --> Dice[Dice / coin]
-  Home --> Settings[Settings: brightness, timeout, orientation, gamma]
-  Card -- menu icon --> TokenMenu{{Token menu}}
-  TokenMenu --> Picker[Token list]
-  TokenMenu --> Decks[Decks]
-  TokenMenu --> CardOptions[Card options: layout, tone, doodles]
-  TokenMenu --> Home
-  Card -- name bar --> Picker
-  Card -- text box --> Counters[Counters]
-  Card -- hold art / DRAW --> Drawing[Drawing]
-  Picker -- DECKS --> Decks
-  Decks -- NEW --> Precons[Precon list]
-  Precons -- EMPTY --> Name[Name a blank deck]
-  Decks -- EDIT --> Picker
-  Life -- round button --> LifeMenu{{Life menu}}
-  LifeMenu --> Dice
-  LifeMenu --> NewGame[New game]
-  LifeMenu --> Home
-```
+1. Tap **TOKENS**. Tap the card's **name** to pick a token (or the **magnifying glass** to search).
+2. Use **+** and **-** to change how many are in play. The middle button switches between quantity (`QTY`), tapped copies (`TAP`), and power/toughness bonuses (`POW`, `TGH`).
+3. Tap the **artwork** to tap or untap them all.
+4. Tap the **rules text** to add counters such as +1/+1, Shield, or Flying.
+5. Tap the **menu icon** for decks, precons, card options, and the main menu.
 
-Every **BACK** returns one step: settings to the main menu, card options, decks, the list, and counters to the card, precons to decks, and dice to wherever it was opened.
+**Playing a precon?** Menu icon → **DECKS / PRECONS** → **NEW**, then tap your precon. Now the card only cycles through that deck's tokens.
+
+**Life**
+
+1. Tap **LIFE COUNTER**. Seat everyone around the board: each panel faces its player.
+2. Tap the **left half** of a panel for **-1** and the **right half** for **+1**; hold to go faster.
+3. Tap a player's **name strip** to record commander damage dealt to them.
+4. The round button in the middle opens **WHO STARTS?**, **NEW GAME** (players and starting life), dice, and more.
+
+**Dice and coins**
+
+Tap **DICE / COIN** in the main menu or the life menu, choose the die and how many, and tap **ROLL**.
+
+**Display looks washed out?** **SETTINGS** in the main menu has brightness, screen timeout, orientation, and gamma. Card-specific looks (layout, tone, doodles) are in **CARD OPTIONS** in the token menu.
 
 ## Hardware
 
@@ -125,6 +147,8 @@ The untapped/tapped groups remain visible in every mode whenever at least one co
 
 The first item in the list, `Custom`, is an editable token. With it selected, tap the lower part of the card (type and text) to open the editor for its name, type line, rules text, color, and P/T. Text fields use an on-screen keyboard, and **SAVE** stores the token in flash.
 
+<img src="docs/screenshots/editor.png" alt="Custom token editor with name, type, text, color, and power/toughness fields" width="200">
+
 Displayed P/T already includes counters and modifiers. Tokens without P/T (such as artifacts) only let you edit quantity and tapped status.
 
 Tokens with variable P/T preserve their printed symbols (`*/*`, `*/1+*`, etc.) instead of displaying them as 0/0. Their modifiers appear beside the symbols; the token board does not know about graveyards, and it does not read the life counter's totals, so it cannot resolve those abilities by itself. Cragflame is an Equipment: its text appears on the card, but equipping it and applying its bonus to another creature remain manual actions.
@@ -133,7 +157,7 @@ Tokens with variable P/T preserve their printed symbols (`*/*`, `*/1+*`, etc.) i
 
 Moustaches welcome. **Hold the artwork for about a second**, or open **Counters** and tap **DRAW**, to decorate the selected token. Page 3 of **CARD OPTIONS** chooses [how drawing starts, where ink goes, and where it is saved](#card-options-page-3-doodles).
 
-<img src="docs/screenshots/drawing.png" alt="Drawing mode with a hand-drawn face and moustache on a custom token, plus Back, Pen, Undo, Clear, and Save controls" width="240"> <img src="docs/screenshots/drawing-palette.png" alt="PEN pop-up over the canvas with eight colors, three brush sizes, and the eraser" width="240">
+<img src="docs/screenshots/drawing.png" alt="Drawing mode with a hand-drawn face, moustache, and crown on a Bird token, plus Back, Pen, Undo, Clear, and Save controls" width="240"> <img src="docs/screenshots/drawing-palette.png" alt="PEN pop-up over the canvas with eight colors, three brush sizes, and the eraser" width="240">
 
 The complete card fits above a separate toolbar, so you can draw without touching game controls. With **DOODLE AREA** set to `WHOLE CARD` (the default) you can draw across the artwork, name, frame, and rules; with `ART ONLY`, ink stays on the artwork and anything already drawn outside it is hidden (not deleted) until you switch back. While drawing, quantity and tap overlays are hidden; game values are not changed. Outside drawing mode, ink remains visible in all three layouts and normal touch actions still work.
 
@@ -165,7 +189,7 @@ Drawings use compact strokes rather than full-screen bitmaps. Each token is limi
 
 Ink is reprojected between layouts, keeping artwork strokes anchored to the artwork; text and frame proportions may differ slightly. Compatible append-only catalog expansions retain saved drawings. Reordered or changed catalog prefixes do not reuse them for another token. Avoid `uploadfs`, which would replace the drawing filesystem.
 
-*Drawing and persistence are covered by the PC harness; resistive-touch feel, flash and microSD writes, and drawing latency still need testing on the physical CYD. A stylus should make small details easier.*
+*Tip: the resistive touchscreen works with a fingernail, but a stylus makes small details much easier.*
 
 ## Counters
 
@@ -234,7 +258,7 @@ The generator also writes every token's artwork at **JPEG quality 90, 4:4:4 colo
 
 **No card is required.** The firmware falls back to embedded art when an SD image cannot be opened, or colored placeholders if there is no embedded art either. Generated files in `sdcard/` are excluded from version control. Use `--no-sd-art` to skip generating them.
 
-*SD loading has been exercised in the PC harness and the firmware build passes. Physical microSD operation still needs validation on the CYD.*
+*microSD artwork has only been tested off-device so far; please open an issue if it does not work on your board.*
 
 Quantities, counters, modifiers, and the selected token are saved in flash (NVS) and restored when the board restarts.
 
@@ -283,9 +307,9 @@ There are two settings screens, each with **<** / **>** to change pages and **BA
 - **SETTINGS** in the main menu holds what affects the whole device: brightness, screen timeout, orientation, and gamma (two pages). **BACK** returns to the main menu.
 - **CARD OPTIONS** in the token menu holds what only affects the token card: layout, card tone, and doodles (three pages). **BACK** returns to the card.
 
-<img src="docs/screenshots/settings-gamma.png" alt="Display gamma page with gamma profile and grayscale and RGB test ramps" width="200"> <img src="docs/screenshots/settings-doodles.png" alt="Doodles page with doodle area, how drawing starts, and where doodles are saved" width="200">
-
-*Captured before settings were split; the page titles on the device now read `SETTINGS 2/2` and `CARD OPTIONS 3/3`.*
+| Settings 1/2 | Settings 2/2 | Card options 2/3 | Card options 3/3 |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/settings.png" alt="Settings page 1: brightness bars, screen off after, and screen orientation" width="170"> | <img src="docs/screenshots/settings-gamma.png" alt="Settings page 2: display gamma profile with grayscale and RGB test ramps" width="170"> | <img src="docs/screenshots/card-tone.png" alt="Card options page 2: card tone with a preview thumbnail" width="170"> | <img src="docs/screenshots/card-doodles.png" alt="Card options page 3: doodle area, how drawing starts, and where doodles are saved" width="170"> |
 
 ### Page 1: brightness, timeout, and screen
 
@@ -336,6 +360,8 @@ The magnifying glass or **FIND** button in the token list opens an on-screen key
 - With multiple space-separated words, every word must match, in any order (`green 3/3` finds green 3/3 tokens).
 - Each word is matched against the name, type line, rules text, color name (`white`, `blue`, `black`, `red`, `green`, `multicolor`, `colorless`), and P/T (`3/3`).
 - **FIND** in the list refines the search while keeping the entered text; **BACK** on the keyboard cancels. Tapping the card's name bar always opens the full list, and **<** / **>** on the card continue to cycle through all tokens.
+
+<img src="docs/screenshots/search.png" alt="Search keyboard with white flying typed and 20 found" width="200"> <img src="docs/screenshots/search-results.png" alt="Search results list for white flying" width="200">
 
 ## Troubleshooting
 
@@ -432,6 +458,18 @@ Results for the 2026-10-24 snapshot:
 - Game designations (Dungeon, Monarch/Initiative, Ring, Boss, Event, Experience/Poison counters) are not tokens because they are not permanents.
 
 </details>
+
+### Updating the screenshots
+
+The images in `docs/screenshots` are captured from a real board. The `shots` build adds serial commands that dump the screen and inject taps, and leaves out embedded artwork:
+
+```bat
+"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e shots -t upload
+"%USERPROFILE%\.platformio\penv\Scripts\python.exe" tools\screenshot.py COM7 shot home tap 120 102 wait 800 shot token-card
+"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e esp32dev -t upload
+```
+
+Steps are `tap X Y`, `hold X Y MS`, `path X,Y X,Y ... end` (a drag), `wait MS`, and `shot NAME` (saves `docs/screenshots/NAME.png`). Coordinates are portrait screen pixels (240x320). The capture reads the display's memory, so the PNGs have the intended colors even though this panel runs with color inversion. Reflash `esp32dev` afterward; the `shots` build is for development only.
 
 ## Saves and firmware updates
 

@@ -14,6 +14,7 @@ Steps run in order:
 Reflash the normal firmware afterwards (`pio run -e esp32dev -t upload`).
 """
 
+import os
 import pathlib
 import struct
 import sys
@@ -22,14 +23,15 @@ import zlib
 
 import serial
 
-SHOT_DIR = pathlib.Path(__file__).resolve().parent.parent / "docs" / "screenshots"
+SHOT_DIR = pathlib.Path(os.environ.get("SHOT_DIR") or pathlib.Path(__file__).resolve().parent.parent / "docs" / "screenshots")
 
 
 def open_port(name):
     port = serial.Serial()
     port.port = name
     port.baudrate = 115200
-    port.timeout = 30
+    # A 3.5-inch frame is about 300 KB, which takes half a minute at this speed.
+    port.timeout = 90
     # Keep DTR/RTS low so opening the port does not reset the board.
     port.dtr = False
     port.rts = False
@@ -70,6 +72,16 @@ def rgb565_rows(width, height, data):
         offset = (y * stride + x) * 2
         return (data[offset] << 8) | data[offset + 1]
 
+    if width != 240:
+        # The ILI9488 reads back cleanly: plain RGB565, with no skew to undo.
+        for y in range(height):
+            row = bytearray(b"\0")
+            for x in range(width):
+                value = pixel(y, x)
+                red, green, blue = value >> 11, (value >> 5) & 63, value & 31
+                row += bytes(((red * 255 + 15) // 31, (green * 255 + 31) // 63, (blue * 255 + 15) // 31))
+            yield bytes(row)
+        return
     for y in range(height):
         row = bytearray(b"\0")
         for x in range(width):
@@ -112,6 +124,10 @@ def main(argv):
             i += 4
         elif step == "wait":
             time.sleep(int(steps[i + 1]) / 1000)
+            i += 2
+        elif step == "L":
+            send(port, f"L {steps[i + 1]}")
+            time.sleep(0.5)
             i += 2
         elif step == "path":
             # path X,Y X,Y ... end: one continuous stroke through the points.

@@ -11,7 +11,7 @@
   <img src="docs/screenshots/dice.png" alt="Three 3D twenty-sided dice showing 13 in total" width="200">
 </p>
 
-An offline Magic: The Gathering table companion for the cheap **CYD ESP32-2432S028R** ("Cheap Yellow Display") board, formerly *CYD MTG Token Tracker*. Flash it once and leave it on the table:
+An offline Magic: The Gathering table companion for the **CYD ESP32-2432S028R** (2.8-inch) and **ESP32-3248S035R** (3.5-inch) "Cheap Yellow Display" boards, formerly *CYD MTG Token Tracker*. Flash it once and leave it on the table:
 
 - **Token board**: 455 tokens from every Commander precon, plus your own custom token. Track how many are in play, how many are tapped, counters, and power/toughness.
 - **Decks and precons**: import the tokens of any of **198 Commander precons** with one tap, or build up to eight decks of your own.
@@ -68,7 +68,7 @@ An offline Magic: The Gathering table companion for the cheap **CYD ESP32-2432S0
 
 ### What you need
 
-- A **CYD ESP32-2432S028R** board (the one with a 2.8-inch **ILI9341** screen and **XPT2046** touch). Other CYD variants may use a different screen or pins.
+- A **CYD ESP32-2432S028R** (2.8-inch ILI9341) or **ESP32-3248S035R** (3.5-inch ILI9488) board, both with XPT2046 resistive touch. Other CYD variants may use a different screen or pins.
 - A USB **data** cable (some cables only charge).
 - A computer with [VS Code and PlatformIO](https://platformio.org/install/ide?install=vscode).
 - Optional: a microSD card, for sharper token artwork or for saving doodles.
@@ -77,12 +77,18 @@ An offline Magic: The Gathering table companion for the cheap **CYD ESP32-2432S0
 
 1. Download or clone this repository and open the folder in VS Code.
 2. Plug in the board. If it is not on **COM7**, change `upload_port` and `monitor_port` in [platformio.ini](platformio.ini) to your board's port.
-3. Click **PlatformIO: Upload** (the arrow in the bottom status bar). The first build takes a few minutes.
+3. Build and upload the matching target: `esp32dev` for the 2.8-inch board or `cyd35` for the 3.5-inch board. In VS Code, select the matching PlatformIO environment before clicking **Upload**.
 
 That's it: the board restarts into the main menu. Prefer the command line? From the project folder:
 
 ```console
 pio run -e esp32dev -t upload
+```
+
+For the 3.5-inch ESP32-3248S035R:
+
+```console
+pio run -e cyd35 -t upload
 ```
 
 On Windows **Command Prompt**, if `pio` is not on your PATH:
@@ -126,12 +132,15 @@ Tap **DICE / COIN** in the main menu or the life menu, choose the die and how ma
 
 | Component | Bus | Configured pins |
 | --- | --- | --- |
-| ILI9341 display | HSPI | SCLK 14, MISO 12, MOSI 13, CS 15, DC 2 |
-| Backlight | LEDC / PWM | GPIO 21 |
-| XPT2046 touch | VSPI | SCLK 25, MISO 39, MOSI 32, CS 33, IRQ 36 |
-| microSD slot | VSPI, shared peripheral with touch | SCLK 18, MISO 19, MOSI 23, CS 5 |
+| 2.8-inch ILI9341 display | HSPI | SCLK 14, MISO 12, MOSI 13, CS 15, DC 2 |
+| Backlight | LEDC / PWM | GPIO 21 (2.8-inch), GPIO 27 (3.5-inch) |
+| 2.8-inch XPT2046 touch | VSPI | SCLK 25, MISO 39, MOSI 32, CS 33, IRQ 36 |
+| 3.5-inch XPT2046 touch | Shared TFT SPI | SCLK 14, MISO 12, MOSI 13, CS 33; IRQ 36 is not used |
+| microSD slot | VSPI (2.8-inch, shared with touch); VSPI on its own (3.5-inch) | SCLK 18, MISO 19, MOSI 23, CS 5 |
 
-The firmware switches VSPI pins around SD accesses, then restores the touch pins. Brightness is controlled directly by `BACKLIGHT_PIN` in [src/main.cpp](src/main.cpp); `TFT_BL` is intentionally not defined so TFT_eSPI does not control it.
+The 2.8-inch firmware switches VSPI pins around SD accesses, then restores the touch pins. On the 3.5-inch board the touch shares the TFT's SPI bus (built with `SUPPORT_TRANSACTIONS`), and the microSD slot uses VSPI on its own. Brightness is controlled directly by `BACKLIGHT_PIN` in [src/main.cpp](src/main.cpp); `TFT_BL` is intentionally not defined so TFT_eSPI does not control it.
+
+The 3.5-inch target uses the ILI9488 over the TFT SPI bus and the XPT2046 on that same bus, with its backlight on GPIO 27. It has a native 320×480 interface, larger controls and card geometry; token artwork keeps its original aspect ratio and is resampled smoothly into the larger art box. The first time it starts, it asks you to tap nine crosses (the corners, the middle of each edge and the center) to calibrate the touch; the result is saved, and it shows the worst error it measured. To redo it, hold the screen while powering on.
 
 ## Controls
 

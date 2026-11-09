@@ -11,7 +11,7 @@
   <img src="docs/screenshots/dice.png" alt="Tres dados de vinte lados em 3D somando 13" width="200">
 </p>
 
-Um companheiro de mesa offline de Magic: The Gathering para a placa barata **CYD ESP32-2432S028R** ("Cheap Yellow Display"), antigo *CYD MTG Token Tracker*. Grave uma vez e deixe na mesa:
+Um companheiro de mesa offline de Magic: The Gathering para as placas **CYD ESP32-2432S028R** (2,8 polegadas) e **ESP32-3248S035R** (3,5 polegadas), "Cheap Yellow Display", antigo *CYD MTG Token Tracker*. Grave uma vez e deixe na mesa:
 
 - **Painel de tokens**: 455 tokens de todos os precons de Commander, mais o seu token personalizado. Acompanhe quantos estao em jogo, quantos estao virados, marcadores e poder/resistencia.
 - **Decks e precons**: importe os tokens de qualquer um dos **198 precons de Commander** com um toque, ou monte ate oito decks seus.
@@ -68,7 +68,7 @@ Um companheiro de mesa offline de Magic: The Gathering para a placa barata **CYD
 
 ### Do que voce precisa
 
-- Uma placa **CYD ESP32-2432S028R** (a de tela **ILI9341** de 2,8 polegadas com touch **XPT2046**). Outras variantes do CYD podem usar outra tela ou outros pinos.
+- Uma placa **CYD ESP32-2432S028R** (tela ILI9341 de 2,8 polegadas) ou **ESP32-3248S035R** (tela ILI9488 de 3,5 polegadas), ambas com touch resistivo XPT2046. Outras variantes do CYD podem usar outra tela ou outros pinos.
 - Um cabo USB **de dados** (alguns cabos so carregam).
 - Um computador com [VS Code e PlatformIO](https://platformio.org/install/ide?install=vscode).
 - Opcional: um cartao microSD, para arte mais nitida ou para salvar desenhos.
@@ -77,12 +77,18 @@ Um companheiro de mesa offline de Magic: The Gathering para a placa barata **CYD
 
 1. Baixe ou clone este repositorio e abra a pasta no VS Code.
 2. Conecte a placa. Se ela nao estiver na **COM7**, troque `upload_port` e `monitor_port` no [platformio.ini](platformio.ini) pela porta da sua placa.
-3. Clique em **PlatformIO: Upload** (a seta na barra de status embaixo). A primeira compilacao leva alguns minutos.
+3. Compile e grave o alvo correspondente: `esp32dev` para a placa de 2,8 polegadas ou `cyd35` para a de 3,5 polegadas. No VS Code, selecione o ambiente PlatformIO correspondente antes de clicar em **Upload**.
 
 Pronto: a placa reinicia no menu principal. Prefere a linha de comando? Na pasta do projeto:
 
 ```console
 pio run -e esp32dev -t upload
+```
+
+Para a ESP32-3248S035R de 3,5 polegadas:
+
+```console
+pio run -e cyd35 -t upload
 ```
 
 No **Prompt de Comando** do Windows, se `pio` nao estiver no PATH:
@@ -126,12 +132,15 @@ Toque em **DICE / COIN** no menu principal ou no menu da vida, escolha o dado e 
 
 | Componente | Barramento | Pinos configurados |
 | --- | --- | --- |
-| Tela ILI9341 | HSPI | SCLK 14, MISO 12, MOSI 13, CS 15, DC 2 |
-| Backlight | LEDC / PWM | GPIO 21 |
-| Touch XPT2046 | VSPI | SCLK 25, MISO 39, MOSI 32, CS 33, IRQ 36 |
-| Slot microSD | VSPI, mesmo periferico do touch | SCLK 18, MISO 19, MOSI 23, CS 5 |
+| Tela ILI9341 de 2,8 polegadas | HSPI | SCLK 14, MISO 12, MOSI 13, CS 15, DC 2 |
+| Backlight | LEDC / PWM | GPIO 21 (2,8 polegadas), GPIO 27 (3,5 polegadas) |
+| Touch XPT2046 de 2,8 polegadas | VSPI | SCLK 25, MISO 39, MOSI 32, CS 33, IRQ 36 |
+| Touch XPT2046 de 3,5 polegadas | SPI compartilhado com TFT | SCLK 14, MISO 12, MOSI 13, CS 33; IRQ 36 nao e usado |
+| Slot microSD | VSPI (2,8 polegadas, junto com o touch); VSPI exclusivo (3,5 polegadas) | SCLK 18, MISO 19, MOSI 23, CS 5 |
 
-O firmware troca os pinos do VSPI ao acessar o SD e depois restaura os do touch. O brilho e controlado diretamente por `BACKLIGHT_PIN` em [src/main.cpp](src/main.cpp); `TFT_BL` fica sem definicao de proposito, para o TFT_eSPI nao controlar esse pino.
+Na placa de 2,8 polegadas, o firmware troca os pinos do VSPI ao acessar o SD e depois restaura os do touch. Na de 3,5 polegadas, o touch compartilha o barramento SPI do TFT (compilado com `SUPPORT_TRANSACTIONS`) e o slot microSD usa o VSPI sozinho. O brilho e controlado diretamente por `BACKLIGHT_PIN` em [src/main.cpp](src/main.cpp); `TFT_BL` fica sem definicao de proposito, para o TFT_eSPI nao controlar esse pino.
+
+O alvo de 3,5 polegadas usa ILI9488 no barramento SPI do TFT e XPT2046 no mesmo barramento, com a luz de fundo no GPIO 27. Ele tem interface nativa de 320×480, controles e cartas maiores; as imagens dos tokens mantem a proporcao original e sao reamostradas suavemente para a area de arte maior. Na primeira inicializacao, ele pede para tocar em nove cruzes (os cantos, o meio de cada borda e o centro) para calibrar o touch; o resultado fica salvo e a tela mostra o pior erro medido. Para refazer, segure a tela ao ligar a placa.
 
 ## Controles
 

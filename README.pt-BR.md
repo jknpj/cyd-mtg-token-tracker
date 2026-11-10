@@ -2,7 +2,7 @@
 
 **Português (Brasil)** | [English](README.md)
 
-**Tokens, pontos de vida, dano de comandante e dados para a sua mesa de Magic, tudo em uma tela touch de 2,8 polegadas. Sem celular, Wi-Fi ou conta durante a partida.**
+**Tokens, pontos de vida, dano de comandante e dados para a sua mesa de Magic, tudo em uma tela touch de 2,8 ou 3,5 polegadas. Sem celular, Wi-Fi ou conta durante a partida.**
 
 <p align="center">
   <img src="docs/screenshots/home.png" alt="Menu principal com Tokens, Life Counter, Dice / Coin e Settings" width="200">
@@ -20,7 +20,7 @@ Um companheiro de mesa offline de Magic: The Gathering para as placas **CYD ESP3
 - **Desenhos**: desenhe bigodes (ou o que quiser) nos seus tokens.
 - **Tudo fica salvo** entre as sessoes: tokens, marcadores, decks, configuracoes e, se quiser, a partida em andamento.
 
-[Capturas de tela](#capturas-de-tela) · [Primeiros passos](#primeiros-passos) · [Como jogar](#como-jogar) · [Tokens](#controles) · [Vida](#vida-e-dano-de-comandante) · [Dados](#dados-e-moeda) · [Configuracoes](#configuracoes) · [Problemas](#solucao-de-problemas) · [Para desenvolvedores](#catalogo-de-tokens)
+[Capturas de tela](#capturas-de-tela) · [Primeiros passos](#primeiros-passos) · [Como jogar](#como-jogar) · [Tokens](#controles) · [Vida](#vida-e-dano-de-comandante) · [Dados](#dados-e-moeda) · [Configuracoes](#configuracoes) · [Problemas](#solucao-de-problemas) · [Para desenvolvedores](#mapa-do-codigo)
 
 ## Capturas de tela
 
@@ -394,6 +394,23 @@ A lupa ou o botao **FIND** da lista de tokens abre um teclado na tela. Digite e 
 
 Os limites iniciais em `src/main.cpp` sao aproximados. Se os botoes responderem em posicoes erradas, calibre `TOUCH_X_MIN`, `TOUCH_X_MAX`, `TOUCH_Y_MIN` e `TOUCH_Y_MAX`. Se os eixos estiverem trocados, ajuste a conversao de `point.x` e `point.y` em `handleTouch()`.
 
+## Mapa do codigo
+
+O firmware e um sketch Arduino mais um header de estado de jogo independente de plataforma; todo o resto e dado gerado ou ferramenta de PC.
+
+| Arquivo | O que fica nele |
+| --- | --- |
+| [src/main.cpp](src/main.cpp) | Toda a UI e o codigo do dispositivo (~6.300 linhas): as 17 telas de `enum class Screen`, o despacho de toques (`handleTableTouch()`, `handleLifeTouch()`), a geometria da carta (`Geometry`), a renderizacao (`drawTablePage()`, `drawArt()`, `drawSettings()`), brilho e gama, o motor de desenhos, a malha 3D dos dados e a arte no microSD |
+| [src/table_state.h](src/table_state.h) | `namespace tabletop`: regras de jogo sem dependencia de Arduino — `DeckBook` (oito decks mais **ALL TOKENS**), `Match` (vida, dano por comandante, marcadores dos jogadores, validacao e migracao de saves), layout de `Seat` e os limites compartilhados (`MAX_PLAYERS` 8, `LIFE_LIMIT` 9999, `DAMAGE_LIMIT` 999, `MAX_DICE` 20) |
+| [src/token_types.h](src/token_types.h) | `Token`, cores, tipos de marcador e o `CustomData` editavel |
+| `src/tokens_generated.h`, `src/precons_generated.h` | Catalogo gerado: **455 tokens** e **198 precons**, ligados pelo mesmo `CATALOG_ID`. Regenere; nunca edite a mao |
+| [tools/fetch_tokens.py](tools/fetch_tokens.py) | Gerador do catalogo e das artes (Scryfall + MTGJSON) |
+| [tools/check_precon_coverage.py](tools/check_precon_coverage.py) | Conferencia independente da cobertura dos precons |
+| [tools/screenshot.py](tools/screenshot.py) | Captura de telas e injecao de toques pela serial, para os builds `shots` |
+| [tools/test_table_state.cpp](tools/test_table_state.cpp), [tools/test_fetch_tokens.py](tools/test_fetch_tokens.py) | Testes unitarios em C++ nativo e em Python |
+
+Comece lendo os simbolos mais conectados: `handleTableTouch()`, `Geometry`, `drawTablePage()`, `Screen` e `Match`. Um mapa navegavel dessas relacoes (simbolos, telas e conceitos do README) pode ser gerado localmente com o `graphify`: ele grava `graphify-out/graph.html` (interativo) e `graphify-out/GRAPH_REPORT.md` (comunidades e hubs). Essa pasta e um artefato local e nao faz parte do repositorio.
+
 ## Catalogo de tokens
 
 Os tokens vem de `src/tokens_generated.h`, gerado a partir da API do Scryfall. Nao edite esse arquivo a mao. O gerador preserva os staples de `SPECS` em `tools/fetch_tokens.py` no inicio e acrescenta os tokens dos precons:
@@ -482,7 +499,13 @@ As imagens em `docs/screenshots` sao capturadas de uma placa real. O build `shot
 "%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e esp32dev -t upload
 ```
 
-Os passos sao `tap X Y`, `hold X Y MS`, `path X,Y X,Y ... end` (arrastar), `wait MS` e `shot NOME` (salva `docs/screenshots/NOME.png`). As coordenadas sao pixels da tela em retrato (240x320). A captura le a memoria do display, entao os PNGs saem com as cores certas mesmo com a inversao de cores deste painel. Grave o `esp32dev` de novo no final; o build `shots` e so para desenvolvimento.
+Na placa de 3,5 polegadas, use o ambiente `shots35` e grave o `cyd35` no final. Esse build mantem a arte embutida, entao as capturas mostram as cartas de verdade:
+
+```bat
+"%USERPROFILE%\.platformio\penv\Scripts\pio.exe" run -e shots35 -t upload
+```
+
+Os passos sao `tap X Y`, `hold X Y MS`, `path X,Y X,Y ... end` (arrastar), `wait MS` e `shot NOME` (salva `docs/screenshots/NOME.png`). As coordenadas sao pixels da tela em retrato: **240x320** no build de 2,8 polegadas e **320x480** no de 3,5 polegadas. A captura le a memoria do display, entao os PNGs saem com as cores certas mesmo com a inversao de cores deste painel. Na ILI9341 de 2,8 polegadas a leitura chega um byte atrasada e o `tools/screenshot.py` recoloca os canais de cor no lugar; a ILI9488 de 3,5 polegadas le sem desvio. Grave o `esp32dev` (ou `cyd35`) de novo no final; os builds `shots` sao so para desenvolvimento.
 
 ## Saves e atualizacoes do firmware
 
